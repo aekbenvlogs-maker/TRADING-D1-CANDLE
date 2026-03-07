@@ -1,17 +1,41 @@
+# Environnement
 .env
 .venv/
 *.pyc
 __pycache__/
+
+# Logs
+trading_d1_bougie/logs/
 trading_d1_bougie/logs/*.log
+
+# Cython build artifacts
 build/
-*.so
-*.c
 dist/
 *.egg-info/
+*.so
+*.pyd
+*.c
+
+# Coverage
+.coverage
+*.coverage
+htmlcov/
+TRADING_D1_BOUGIE_coverage_report.html
+coverage.xml
+
+# Cache
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
-TRADING_D1_BOUGIE_coverage_report.html
-htmlcov/
+
+# Debug scripts personnels
+_debug_*.py
+
+# Feuilles de route internes
+TRADING-D1-BOUGIE.md
+
+# Outputs backtest
 TRADING_D1_BOUGIE_backtest_results.csv
+TRADING_D1_BOUGIE_backtest_results_*.csv
 TRADING_D1_BOUGIE_equity_curve.png
+TRADING_D1_BOUGIE_equity_curve_*.png
