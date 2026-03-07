@@ -15,8 +15,12 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from dotenv import load_dotenv
 from loguru import logger
 from rich.console import Console
+
+# Charger .env avant toute lecture d'os.getenv
+load_dotenv(Path(".env"), override=False)
 
 from trading_d1_bougie.engine.broker_api import BrokerAPI
 from trading_d1_bougie.engine.dashboard import Dashboard
@@ -180,15 +184,19 @@ async def _main_loop(
                 validation = entry_validator.validate(
                     price, d1_ranges[pair], trend_bias, signal
                 )
+                val_status = str(
+                    validation.status.value
+                    if hasattr(validation.status, "value")
+                    else validation.status
+                )
+                is_valid = val_status == "VALID"
                 dashboard.update_pair(
                     pair,
-                    zone_status="IN ZONE ✅"
-                    if validation.is_valid
-                    else validation.status.value,
-                    eligible=validation.is_valid,
+                    zone_status="IN ZONE ✅" if is_valid else val_status,
+                    eligible=is_valid,
                 )
 
-                if not validation.is_valid:
+                if not is_valid:
                     continue
 
                 # -------------------------------------------------------- #
@@ -239,6 +247,38 @@ async def _main_loop(
             live.update(dashboard.render())
 
 
+async def _connect_with_retry(
+    broker: BrokerAPI,
+    dashboard: Dashboard,
+    max_attempts: int = 0,
+    delay: float = 10.0,
+) -> bool:
+    """
+    Tente de se connecter à IB Gateway.
+
+    max_attempts=0 → boucle infinie (attend jusqu'à ce que IB Gateway
+    soit disponible). Retourne True dès la connexion réussie.
+    """
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            await broker.connect()
+            dashboard.set_ib_connected(True)
+            logger.info(f"[Main] ✅ IB Gateway connecté (tentative {attempt})")
+            return True
+        except Exception as exc:  # noqa: BLE001
+            dashboard.set_ib_connected(False)
+            logger.warning(
+                f"[Main] IB Gateway non disponible (tentative {attempt}) : {exc}\n"
+                f"       → Retry dans {delay:.0f}s … (Ctrl+C pour quitter)"
+            )
+            if max_attempts > 0 and attempt >= max_attempts:
+                logger.error("[Main] Nombre maximum de tentatives atteint")
+                return False
+            await asyncio.sleep(delay)
+
+
 async def main() -> None:
     _check_paper_mode()
 
@@ -255,6 +295,8 @@ async def main() -> None:
         spread_filter_pips=cfg["strategy"]["spread_filter_pips"],
     )
 
+    logger.remove()
+    logger.add(sys.stdout, level="INFO", format="<green>{time:HH:mm:ss}</green> | {message}")
     logger.add(
         "trading_d1_bougie/logs/main_{time}.log",
         rotation=cfg["logging"]["rotation"],
@@ -262,13 +304,23 @@ async def main() -> None:
         level=cfg["logging"]["level"],
     )
 
+    logger.info("══════════════════════════════════════════════════════")
+    logger.info("  TRADING-D1-BOUGIE — Paper Trading Live (Phase 10)")
+    logger.info(f"  Paires : {', '.join(pairs)}")
+    logger.info(f"  IB Gateway : {os.getenv('IB_HOST', '127.0.0.1')}:{os.getenv('IB_PORT', '4002')}")
+    logger.info("══════════════════════════════════════════════════════")
+
     try:
-        await broker.connect()
-        dashboard.set_ib_connected(True)
+        # Connexion avec retry infini — attend IB Gateway
+        connected = await _connect_with_retry(broker, dashboard, delay=10.0)
+        if not connected:
+            logger.error("[Main] Impossible de se connecter — arrêt")
+            return
+
         await data_feed.start()
         await _main_loop(broker, data_feed, session_mgr, dashboard, cfg)
     except KeyboardInterrupt:
-        logger.info("[Main] Interrupted by user")
+        logger.info("[Main] Interrupted by user (Ctrl+C)")
     finally:
         await data_feed.stop()
         await broker.disconnect()

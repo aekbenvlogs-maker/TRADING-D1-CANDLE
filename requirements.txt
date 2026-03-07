@@ -13,6 +13,7 @@ Cython==3.0.8
 # Dashboard & Logging
 rich==13.7.0
 loguru==0.7.2
+python-dotenv>=1.0.0
 
 # Code Quality
 black==23.12.1

@@ -45,13 +45,16 @@ class BrokerAPI:
     # Connexion                                                           #
     # ------------------------------------------------------------------ #
 
-    async def connect(self) -> None:
-        """Connecte à IB Gateway avec auto-reconnect."""
+    async def connect(self, timeout: float = 8.0) -> None:
+        """Connecte à IB Gateway avec timeout explicite."""
         logger.info(f"Connecting to IB Gateway {self._host}:{self._port}…")
-        await self.ib.connectAsync(
-            host=self._host,
-            port=self._port,
-            clientId=self._client_id,
+        await asyncio.wait_for(
+            self.ib.connectAsync(
+                host=self._host,
+                port=self._port,
+                clientId=self._client_id,
+            ),
+            timeout=timeout,
         )
         self._connected = True
         self.ib.disconnectedEvent += self._on_disconnected
