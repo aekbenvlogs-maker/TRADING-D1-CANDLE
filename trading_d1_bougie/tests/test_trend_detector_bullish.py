@@ -7,11 +7,10 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-import pytest
 from enum import Enum
 
-
 # Pure Python mirror du TrendDetector Cython (avant compilation)
+
 
 class TrendBias(Enum):
     BULLISH = "BULLISH"
@@ -67,8 +66,8 @@ class TrendDetector:
         return TrendBias.NEUTRAL
 
 
-def _make_candle(h, l, o=None, c=None):
-    return {"open": o or l, "high": h, "low": l, "close": c or h, "volume": 100}
+def _make_candle(h, low_, o=None, c=None):
+    return {"open": o or low_, "high": h, "low": low_, "close": c or h, "volume": 100}
 
 
 def _bullish_candles():
@@ -117,7 +116,7 @@ class TestTrendDetectorBullish:
         assert result == TrendBias.BULLISH
 
     def test_swing_highs_found(self):
-        """find_swing_highs doit retourner au moins 2 swings sur une séquence bullish."""
+        """find_swing_highs retourne au moins 2 swings sur séquence bullish."""
         candles = _bullish_candles()
         highs = self.detector.find_swing_highs(candles)
         assert len(highs) >= 2

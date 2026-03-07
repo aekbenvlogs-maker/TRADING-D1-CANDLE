@@ -9,14 +9,10 @@
 # ============================================================
 
 import asyncio
-import os
-from pathlib import Path
-from typing import Optional
+from typing import Any
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
-import vectorbt as vbt
 from loguru import logger
 
 from trading_d1_bougie.engine.broker_api import BrokerAPI
@@ -88,13 +84,29 @@ class BacktestRunner:
         )
 
         d1_df = pd.DataFrame(
-            [{"date": b.date, "open": b.open, "high": b.high, "low": b.low, "close": b.close}
-             for b in d1_bars]
+            [
+                {
+                    "date": b.date,
+                    "open": b.open,
+                    "high": b.high,
+                    "low": b.low,
+                    "close": b.close,
+                }
+                for b in d1_bars
+            ]
         ).set_index("date")
 
         m15_df = pd.DataFrame(
-            [{"date": b.date, "open": b.open, "high": b.high, "low": b.low, "close": b.close}
-             for b in m15_bars]
+            [
+                {
+                    "date": b.date,
+                    "open": b.open,
+                    "high": b.high,
+                    "low": b.low,
+                    "close": b.close,
+                }
+                for b in m15_bars
+            ]
         ).set_index("date")
 
         return d1_df, m15_df
@@ -170,22 +182,24 @@ class BacktestRunner:
                 if sl_pips <= 0:
                     continue
 
-                records.append({
-                    "date": day_m15.index[j],
-                    "direction": direction,
-                    "entry": price,
-                    "sl": sl,
-                    "tp": tp,
-                    "sl_pips": sl_pips,
-                    "tp_pips": tp_pips,
-                })
+                records.append(
+                    {
+                        "date": day_m15.index[j],
+                        "direction": direction,
+                        "entry": price,
+                        "sl": sl,
+                        "tp": tp,
+                        "sl_pips": sl_pips,
+                        "tp_pips": tp_pips,
+                    }
+                )
                 break  # 1 trade max par jour
 
         return pd.DataFrame(records)
 
     def _compute_metrics(
         self, trades: pd.DataFrame, initial_equity: float = 10_000.0
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Calcule les métriques de performance."""
         if trades.empty:
             return {"error": "No trades generated"}
@@ -200,16 +214,24 @@ class BacktestRunner:
 
         # Courbe d'equity simplifiée (1% risk, RR 2)
         pnl_series = pd.Series(
-            [self.risk_pct * self.rr_ratio if d == "win" else -self.risk_pct
-             for d in trades.apply(
-                 lambda r: "win" if r["tp_pips"] > 0 else "loss", axis=1
-             )]
+            [
+                self.risk_pct * self.rr_ratio if d == "win" else -self.risk_pct
+                for d in trades.apply(
+                    lambda r: "win" if r["tp_pips"] > 0 else "loss", axis=1
+                )
+            ]
         )
         equity_curve = initial_equity * (1 + pnl_series.cumsum() / 100)
-        max_dd = ((equity_curve.cummax() - equity_curve) / equity_curve.cummax()).max() * 100
+        max_dd = (
+            (equity_curve.cummax() - equity_curve) / equity_curve.cummax()
+        ).max() * 100
 
         returns = pnl_series / 100
-        sharpe = (returns.mean() / returns.std() * (252 ** 0.5)) if returns.std() > 0 else 0.0
+        sharpe = (
+            (returns.mean() / returns.std() * (252**0.5))
+            if returns.std() > 0
+            else 0.0
+        )
 
         return {
             "total_trades": total,
@@ -220,7 +242,7 @@ class BacktestRunner:
             "equity_curve": equity_curve,
         }
 
-    async def run(self, days: int = 365) -> dict:
+    async def run(self, days: int = 365) -> dict[str, Any]:
         """
         Lance le backtest complet et exporte les résultats.
 
@@ -281,6 +303,7 @@ async def _main() -> None:
     await broker.connect()
 
     import yaml
+
     with open("trading_d1_bougie/config/config.yaml") as f:
         cfg = yaml.safe_load(f)
 
@@ -296,7 +319,7 @@ async def _main() -> None:
 
     results = await runner.run(days=365)
     await broker.disconnect()
-    return results
+    logger.info(f"[Backtest] Done — {len(results)} pairs processed")
 
 
 if __name__ == "__main__":

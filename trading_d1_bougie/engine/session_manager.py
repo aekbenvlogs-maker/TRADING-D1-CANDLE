@@ -31,10 +31,10 @@ class SessionManager:
     """
 
     # Heures locales fixes — la conversion UTC tient compte du DST
-    LONDON_OPEN_LOCAL = time(8, 0)    # 08:00 London time
+    LONDON_OPEN_LOCAL = time(8, 0)  # 08:00 London time
     LONDON_CLOSE_LOCAL = time(17, 0)  # 17:00 London time
-    NY_OPEN_LOCAL = time(9, 30)       # 09:30 New York time
-    NY_CLOSE_LOCAL = time(17, 0)      # 17:00 New York time
+    NY_OPEN_LOCAL = time(9, 30)  # 09:30 New York time
+    NY_CLOSE_LOCAL = time(17, 0)  # 17:00 New York time
 
     def now_utc(self) -> datetime:
         """Retourne l'heure courante en UTC."""
@@ -57,7 +57,7 @@ class SessionManager:
         return self.NY_OPEN_LOCAL <= t < self.NY_CLOSE_LOCAL
 
     def is_weekend(self, dt_utc: datetime | None = None) -> bool:
-        """Retourne True si c'est le week-end Forex (vendredi 22h UTC → dimanche 22h UTC)."""
+        """True si week-end Forex (vendredi 22h UTC → dimanche 22h UTC)."""
         if dt_utc is None:
             dt_utc = self.now_utc()
         weekday = dt_utc.weekday()  # 0=lundi … 6=dimanche
@@ -102,7 +102,7 @@ class SessionManager:
 
         return self._is_london_open(dt_utc) and self._is_ny_open(dt_utc)
 
-    def format_timestamp(self, dt_utc: datetime | None = None) -> dict:
+    def format_timestamp(self, dt_utc: datetime | None = None) -> dict[str, str]:
         """
         Retourne les timestamps formatés pour l'affichage dashboard.
 

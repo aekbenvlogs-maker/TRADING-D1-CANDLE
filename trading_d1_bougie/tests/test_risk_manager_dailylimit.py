@@ -8,7 +8,11 @@
 # ============================================================
 
 import pytest
-from trading_d1_bougie.tests.test_risk_manager_lotsize import RiskManager, RiskCheckResult
+
+from trading_d1_bougie.tests.test_risk_manager_lotsize import (
+    RiskCheckResult,
+    RiskManager,
+)
 
 
 class TestRiskManagerDailyLimit:

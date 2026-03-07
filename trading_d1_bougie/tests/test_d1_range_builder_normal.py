@@ -7,17 +7,26 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-import pytest
-from unittest.mock import MagicMock, patch
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # Helpers — pure Python simulation du D1RangeBuilder (avant compilation Cython)
 # ---------------------------------------------------------------------------
 
+
 class D1Range:
-    def __init__(self, pair, high, low, mid, fibo_zone_upper,
-                 fibo_zone_lower, proximity_upper, proximity_lower):
+    def __init__(
+        self,
+        pair,
+        high,
+        low,
+        mid,
+        fibo_zone_upper,
+        fibo_zone_lower,
+        proximity_upper,
+        proximity_lower,
+    ):
         self.pair = pair
         self.high = high
         self.low = low
@@ -35,7 +44,7 @@ class D1RangeBuilder:
 
     def build(self, pair, d1_high, d1_low):
         if d1_high <= d1_low:
-            raise ValueError(f"d1_high must be > d1_low")
+            raise ValueError("d1_high must be > d1_low")
         height = d1_high - d1_low
         mid = (d1_high + d1_low) / 2.0
         fibo_offset = height * self.fibo_forbidden_pct / 100.0
@@ -55,6 +64,7 @@ class D1RangeBuilder:
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
+
 
 class TestD1RangeBuilderNormal:
     """Test 1 : Rectangle correct sur données normales."""

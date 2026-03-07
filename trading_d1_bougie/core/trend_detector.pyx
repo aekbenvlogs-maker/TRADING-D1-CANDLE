@@ -111,13 +111,16 @@ cdef class TrendDetector:
         if len(highs) < 2 or len(lows) < 2:
             return TrendBias.NEUTRAL
 
+        cdef int nh = len(highs)
+        cdef int nl = len(lows)
+
         # Deux derniers swing highs
-        cdef double last_hh = highs[-1]["price"]
-        cdef double prev_hh = highs[-2]["price"]
+        cdef double last_hh = highs[nh - 1]["price"]
+        cdef double prev_hh = highs[nh - 2]["price"]
 
         # Deux derniers swing lows
-        cdef double last_hl = lows[-1]["price"]
-        cdef double prev_hl = lows[-2]["price"]
+        cdef double last_hl = lows[nl - 1]["price"]
+        cdef double prev_hl = lows[nl - 2]["price"]
 
         cdef bint higher_highs = last_hh > prev_hh
         cdef bint higher_lows = last_hl > prev_hl

@@ -7,10 +7,13 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-import pytest
 from trading_d1_bougie.tests.test_entry_validator_valid import (
-    EntryValidator, TrendBias, StructureSignal, StructureType,
-    ValidationStatus, D1Range, _make_d1
+    D1Range,
+    EntryValidator,
+    StructureSignal,
+    StructureType,
+    TrendBias,
+    ValidationStatus,
 )
 
 
@@ -80,7 +83,7 @@ class TestEntryValidatorFiboForbidden:
         assert result.status == ValidationStatus.INVALID_FIBO_FORBIDDEN_ZONE
 
     def test_valid_just_below_fibo_zone(self):
-        """Prix juste en-dessous de la zone Fibo + près du LOW → valide si autres checks OK."""
+        """Prix juste sous la zone Fibo + près du LOW → valide si autres checks OK."""
         # 1.09440 < fibo_zone_lower (1.09450) et <= prox_lower (1.09100)
         # Prix 1.09050 est près du LOW et hors Fibo
         result = self.validator.validate(

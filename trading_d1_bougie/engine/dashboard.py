@@ -9,14 +9,13 @@
 # ============================================================
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from rich.console import Console
 from rich.layout import Layout
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
 
 
 class Dashboard:
@@ -45,12 +44,11 @@ class Dashboard:
             pair: self._default_state() for pair in pairs
         }
         self._ib_connected: bool = False
-        self._daily_stats: dict[str, dict] = {
-            pair: {"trades": 0, "pnl_pips": 0.0, "pnl_usd": 0.0}
-            for pair in pairs
+        self._daily_stats: dict[str, dict[str, Any]] = {
+            pair: {"trades": 0, "pnl_pips": 0.0, "pnl_usd": 0.0} for pair in pairs
         }
 
-    def _default_state(self) -> dict:
+    def _default_state(self) -> dict[str, Any]:
         return {
             "d1_high": None,
             "d1_low": None,
@@ -76,23 +74,32 @@ class Dashboard:
     def set_ib_connected(self, connected: bool) -> None:
         self._ib_connected = connected
 
-    def update_daily_stats(self, pair: str, trades: int, pnl_pips: float, pnl_usd: float) -> None:
+    def update_daily_stats(
+        self, pair: str, trades: int, pnl_pips: float, pnl_usd: float
+    ) -> None:
         if pair in self._daily_stats:
-            self._daily_stats[pair] = {"trades": trades, "pnl_pips": pnl_pips, "pnl_usd": pnl_usd}
+            self._daily_stats[pair] = {
+                "trades": trades,
+                "pnl_pips": pnl_pips,
+                "pnl_usd": pnl_usd,
+            }
 
     # ------------------------------------------------------------------ #
     # Rendu                                                               #
     # ------------------------------------------------------------------ #
 
     def _build_header(self) -> Panel:
-        ib_status = "[green]🟢 IB CONNECTED[/green]" if self._ib_connected else "[red]🔴 IB DISCONNECTED[/red]"
+        ib_status = (
+            "[green]🟢 IB CONNECTED[/green]"
+            if self._ib_connected
+            else "[red]🔴 IB DISCONNECTED[/red]"
+        )
         now_utc = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
 
         from zoneinfo import ZoneInfo
-        from datetime import timezone
+
         paris = datetime.now(tz=ZoneInfo("Europe/Paris")).strftime("%H:%M:%S %Z")
 
-        title = Text(self.TITLE, style="bold cyan")
         status_line = f"{ib_status}   🕐 {now_utc}  |  {paris}"
         return Panel(
             f"[bold cyan]{self.TITLE}[/bold cyan]\n{status_line}",
@@ -129,13 +136,15 @@ class Dashboard:
             d1_mid = f"{s['d1_mid']:.5f}" if s["d1_mid"] else "—"
 
             trend_color = {
-                "BULLISH": "green", "BEARISH": "red", "NEUTRAL": "yellow"
+                "BULLISH": "green",
+                "BEARISH": "red",
+                "NEUTRAL": "yellow",
             }.get(s["trend"], "white")
             trend = f"[{trend_color}]{s['trend']}[/{trend_color}]"
 
-            struct_color = {
-                "BOS": "cyan", "CHoCH": "magenta", "NONE": "dim"
-            }.get(s["structure"], "white")
+            struct_color = {"BOS": "cyan", "CHoCH": "magenta", "NONE": "dim"}.get(
+                s["structure"], "white"
+            )
             structure = f"[{struct_color}]{s['structure']}[/{struct_color}]"
 
             zone_color = "green" if "IN ZONE" in str(s["zone_status"]) else "red"

@@ -7,9 +7,10 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-import pytest
 from trading_d1_bougie.tests.test_structure_detector_bos import (
-    StructureDetector, StructureType, _c
+    StructureDetector,
+    StructureType,
+    _c,
 )
 
 
@@ -51,7 +52,9 @@ class TestStructureDetectorCHoCH:
         swing_highs = [{"index": 0, "price": 1.0910}, {"index": 0, "price": 1.0915}]
         swing_lows = [{"index": 0, "price": 1.0896}, {"index": 0, "price": 1.0898}]
 
-        candles.append(_c(1.0905, 1.0908))  # body entre 1.0905 et 1.0908 — sous les swings highs
+        candles.append(
+            _c(1.0905, 1.0908)
+        )  # body entre 1.0905 et 1.0908 — sous les swings highs
         result = self.detector.detect(candles, swing_highs, swing_lows, "BEARISH")
 
         assert result.signal_type == StructureType.NONE

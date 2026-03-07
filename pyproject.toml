@@ -9,6 +9,21 @@ line-length = 88
 
 [tool.pytest.ini_options]
 testpaths = ["trading_d1_bougie/tests"]
-verbose = true
 asyncio_mode = "auto"
 addopts = "--cov=trading_d1_bougie --cov-report=html:TRADING_D1_BOUGIE_coverage_report.html"
+
+[tool.coverage.run]
+# Engine files require IB Gateway (live trading) — untestable in unit tests
+omit = [
+    "trading_d1_bougie/engine/*",
+    "setup.py",
+]
+
+[tool.coverage.report]
+skip_empty = true
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "@(abc\\.)?abstractmethod",
+]

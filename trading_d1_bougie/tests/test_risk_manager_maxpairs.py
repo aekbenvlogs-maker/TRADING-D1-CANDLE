@@ -7,8 +7,10 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-import pytest
-from trading_d1_bougie.tests.test_risk_manager_lotsize import RiskManager, RiskCheckResult
+from trading_d1_bougie.tests.test_risk_manager_lotsize import (
+    RiskCheckResult,
+    RiskManager,
+)
 
 
 class TestRiskManagerMaxPairs:

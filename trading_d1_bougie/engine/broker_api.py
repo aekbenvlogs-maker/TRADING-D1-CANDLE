@@ -12,9 +12,9 @@ import asyncio
 import os
 import time
 from collections import deque
-from typing import Optional
+from typing import Any
 
-from ib_insync import IB, Contract, util
+from ib_insync import IB, Contract
 from loguru import logger
 
 
@@ -90,7 +90,9 @@ class BrokerAPI:
         """Limite à MAX_REQUESTS requêtes par THROTTLE_WINDOW secondes."""
         now = time.monotonic()
         # Purger les timestamps hors fenêtre
-        while self._request_times and now - self._request_times[0] > self.THROTTLE_WINDOW:
+        while (
+            self._request_times and now - self._request_times[0] > self.THROTTLE_WINDOW
+        ):
             self._request_times.popleft()
         if len(self._request_times) >= self.MAX_REQUESTS:
             wait = self.THROTTLE_WINDOW - (now - self._request_times[0])
@@ -112,7 +114,7 @@ class BrokerAPI:
             currency=pair[3:],
         )
 
-    async def get_d1_candle(self, pair: str) -> Optional[dict]:
+    async def get_d1_candle(self, pair: str) -> dict[str, Any] | None:
         """
         Retourne la bougie D1 de la veille.
 
@@ -145,7 +147,7 @@ class BrokerAPI:
             "volume": bar.volume,
         }
 
-    async def get_m15_candles(self, pair: str, n: int = 100) -> list[dict]:
+    async def get_m15_candles(self, pair: str, n: int = 100) -> list[dict[str, Any]]:
         """
         Retourne les N dernières bougies M15.
 
@@ -200,4 +202,4 @@ class BrokerAPI:
         else:
             spread_pips = 0.0
         self.ib.cancelMktData(contract)
-        return spread_pips
+        return float(spread_pips)

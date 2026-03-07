@@ -74,16 +74,20 @@ cdef class StructureDetector:
         if not candles or not swing_highs or not swing_lows:
             return StructureSignal(StructureType.NONE)
 
-        cdef dict last_candle = candles[-1]
+        cdef int nc = len(candles)
+        cdef int nsh = len(swing_highs)
+        cdef int nsl = len(swing_lows)
+        cdef int last_idx = nc - 1
+
+        cdef dict last_candle = candles[last_idx]
         cdef double body_high = max(last_candle["open"], last_candle["close"])
         cdef double body_low = min(last_candle["open"], last_candle["close"])
-        cdef int last_idx = len(candles) - 1
 
         # Dernier swing high et low
-        cdef double last_swing_high = swing_highs[-1]["price"]
-        cdef double last_swing_low = swing_lows[-1]["price"]
-        cdef double prev_swing_high = swing_highs[-2]["price"] if len(swing_highs) >= 2 else last_swing_high
-        cdef double prev_swing_low = swing_lows[-2]["price"] if len(swing_lows) >= 2 else last_swing_low
+        cdef double last_swing_high = swing_highs[nsh - 1]["price"]
+        cdef double last_swing_low = swing_lows[nsl - 1]["price"]
+        cdef double prev_swing_high = swing_highs[nsh - 2]["price"] if nsh >= 2 else last_swing_high
+        cdef double prev_swing_low = swing_lows[nsl - 2]["price"] if nsl >= 2 else last_swing_low
 
         # ------------------------------------------------------------------ #
         # BOS haussier : body clôture AU-DESSUS du dernier swing high         #

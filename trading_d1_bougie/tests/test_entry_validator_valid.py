@@ -7,11 +7,10 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-import pytest
 from enum import Enum
 
-
 # Mirrors Python des classes Cython
+
 
 class ValidationStatus(Enum):
     VALID = "VALID"
@@ -72,7 +71,9 @@ class EntryValidator:
         if d1_range.fibo_zone_lower <= price <= d1_range.fibo_zone_upper:
             return ValidationResult(ValidationStatus.INVALID_FIBO_FORBIDDEN_ZONE)
         if structure_signal.signal_type == StructureType.NONE:
-            return ValidationResult(ValidationStatus.INVALID_AGAINST_TREND, reason="No signal")
+            return ValidationResult(
+                ValidationStatus.INVALID_AGAINST_TREND, reason="No signal"
+            )
         sig_dir = structure_signal.direction
         if trend_bias == TrendBias.BULLISH and sig_dir != "BULLISH":
             return ValidationResult(ValidationStatus.INVALID_AGAINST_TREND)

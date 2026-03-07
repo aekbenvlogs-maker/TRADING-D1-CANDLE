@@ -12,6 +12,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import yaml
 from loguru import logger
@@ -25,10 +26,10 @@ from trading_d1_bougie.engine.session_manager import SessionManager
 console = Console()
 
 
-def _load_config() -> dict:
+def _load_config() -> dict[str, Any]:
     config_path = Path("trading_d1_bougie/config/config.yaml")
     with open(config_path) as f:
-        return yaml.safe_load(f)
+        return yaml.safe_load(f)  # type: ignore[no-any-return]
 
 
 def _check_paper_mode() -> None:
@@ -38,24 +39,26 @@ def _check_paper_mode() -> None:
 
     if paper != "true" or mode == "live":
         console.print(
-            "\n[bold red]╔══════════════════════════════════════════════════════════════╗[/bold red]"
+            "\n[bold red]╔══════════════════════════════════════════════════════════════╗[/bold red]"  # noqa: E501
         )
         console.print(
-            "[bold red]║   ⚠️  ATTENTION — MODE LIVE TRADING                         ║[/bold red]"
+            "[bold red]║   ⚠️  ATTENTION — MODE LIVE TRADING                         ║[/bold red]"  # noqa: E501
         )
         console.print(
-            "[bold red]║                                                              ║[/bold red]"
+            "[bold red]║                                                              ║[/bold red]"  # noqa: E501
         )
         console.print(
-            "[bold red]║   Le mode live (port 4001) engage du capital RÉEL.          ║[/bold red]"
+            "[bold red]║   Le mode live (port 4001) engage du capital RÉEL.          ║[/bold red]"  # noqa: E501
         )
         console.print(
-            "[bold red]║   Ne l'activer QUE après validation complète du backtest.   ║[/bold red]"
+            "[bold red]║   Ne l'activer QUE après validation complète du backtest.   ║[/bold red]"  # noqa: E501
         )
         console.print(
-            "[bold red]╚══════════════════════════════════════════════════════════════╝[/bold red]\n"
+            "[bold red]╚══════════════════════════════════════════════════════════════╝[/bold red]\n"  # noqa: E501
         )
-        confirm = input("Confirmer le mode LIVE ? Tapez 'LIVE-CONFIRMED' pour continuer : ")
+        confirm = input(
+            "Confirmer le mode LIVE ? Tapez 'LIVE-CONFIRMED' pour continuer : "
+        )
         if confirm.strip() != "LIVE-CONFIRMED":
             console.print("[yellow]Annulé. Repassez en mode paper dans .env[/yellow]")
             sys.exit(0)
@@ -68,15 +71,17 @@ async def _main_loop(
     data_feed: DataFeed,
     session_mgr: SessionManager,
     dashboard: Dashboard,
-    cfg: dict,
+    cfg: dict[str, Any],
 ) -> None:
     """Boucle principale asynchrone de la stratégie."""
     from trading_d1_bougie.core.d1_range_builder import D1RangeBuilder
     from trading_d1_bougie.core.entry_validator import EntryValidator
     from trading_d1_bougie.core.order_manager import OrderManager
-    from trading_d1_bougie.core.risk_manager import RiskManager, RiskCheckResult
-    from trading_d1_bougie.core.structure_detector import StructureDetector, StructureType
-    from trading_d1_bougie.core.trend_detector import TrendDetector, TrendBias
+    from trading_d1_bougie.core.risk_manager import RiskCheckResult, RiskManager
+    from trading_d1_bougie.core.structure_detector import (
+        StructureDetector,
+    )
+    from trading_d1_bougie.core.trend_detector import TrendDetector
 
     strategy = cfg["strategy"]
     risk_cfg = cfg["risk"]
@@ -97,10 +102,10 @@ async def _main_loop(
     )
 
     pairs = strategy["pairs"]
-    d1_ranges: dict = {}
+    d1_ranges: dict[str, Any] = {}
     equity_start: float = 10_000.0  # À récupérer depuis le compte IB
     open_pairs: list[str] = []
-    daily_trade_count: dict = {p: 0 for p in pairs}
+    daily_trade_count: dict[str, int] = {p: 0 for p in pairs}
 
     logger.info("[Main] 🚀 Starting main loop…")
 
@@ -167,7 +172,9 @@ async def _main_loop(
                 dashboard.update_pair(pair, spread_pips=spread)
 
                 if spread > strategy["spread_filter_pips"]:
-                    dashboard.update_pair(pair, zone_status="SPREAD TROP ÉLEVÉ", eligible=False)
+                    dashboard.update_pair(
+                        pair, zone_status="SPREAD TROP ÉLEVÉ", eligible=False
+                    )
                     continue
 
                 validation = entry_validator.validate(
@@ -175,7 +182,9 @@ async def _main_loop(
                 )
                 dashboard.update_pair(
                     pair,
-                    zone_status="IN ZONE ✅" if validation.is_valid else validation.status.value,
+                    zone_status="IN ZONE ✅"
+                    if validation.is_valid
+                    else validation.status.value,
                     eligible=validation.is_valid,
                 )
 
@@ -186,19 +195,28 @@ async def _main_loop(
                 # Risk checks                                               #
                 # -------------------------------------------------------- #
                 equity_current = equity_start  # TODO: récupérer depuis broker
-                if risk_manager.check_daily_limit(equity_start, equity_current) != RiskCheckResult.ALLOWED:
+                if (
+                    risk_manager.check_daily_limit(equity_start, equity_current)
+                    != RiskCheckResult.ALLOWED
+                ):
                     logger.warning("[Main] Daily loss limit reached — SHUTDOWN")
                     return
 
-                if risk_manager.check_max_pairs(len(open_pairs)) != RiskCheckResult.ALLOWED:
-                    logger.warning(f"[Main] Max open pairs ({risk_cfg['max_open_pairs']}) reached")
+                if (
+                    risk_manager.check_max_pairs(len(open_pairs))
+                    != RiskCheckResult.ALLOWED
+                ):
+                    logger.warning(
+                        f"[Main] Max open pairs ({risk_cfg['max_open_pairs']}) reached"
+                    )
                     continue
 
                 # -------------------------------------------------------- #
                 # Étape 5 — Construire et envoyer l'ordre                 #
                 # -------------------------------------------------------- #
                 swing_sl = (
-                    d1_ranges[pair].low if validation.direction == "LONG"
+                    d1_ranges[pair].low
+                    if validation.direction == "LONG"
                     else d1_ranges[pair].high
                 )
                 lot_size = risk_manager.calculate_lot_size(

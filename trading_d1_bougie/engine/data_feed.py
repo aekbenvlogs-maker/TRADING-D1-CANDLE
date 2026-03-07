@@ -10,7 +10,8 @@
 
 import asyncio
 from collections import deque
-from typing import Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from loguru import logger
 
@@ -44,21 +45,21 @@ class DataFeed:
         self.poll_interval = poll_interval_seconds
 
         # Buffer M15 par paire
-        self._buffers: dict[str, deque[dict]] = {
+        self._buffers: dict[str, deque[dict[str, Any]]] = {
             pair: deque(maxlen=buffer_size) for pair in pairs
         }
 
         # Callbacks enregistrés
-        self._callbacks: list[Callable[[str, dict], None]] = []
+        self._callbacks: list[Callable[[str, dict[str, Any]], None]] = []
 
         self._running = False
-        self._tasks: list[asyncio.Task] = []
+        self._tasks: list[asyncio.Task[None]] = []
 
     # ------------------------------------------------------------------ #
     # API publique                                                        #
     # ------------------------------------------------------------------ #
 
-    def subscribe(self, callback: Callable[[str, dict], None]) -> None:
+    def subscribe(self, callback: Callable[[str, dict[str, Any]], None]) -> None:
         """
         Enregistre un callback appelé à chaque nouvelle bougie M15.
 
@@ -67,7 +68,7 @@ class DataFeed:
         """
         self._callbacks.append(callback)
 
-    def get_candles(self, pair: str) -> list[dict]:
+    def get_candles(self, pair: str) -> list[dict[str, Any]]:
         """
         Retourne les bougies M15 en mémoire pour une paire.
 
@@ -125,7 +126,8 @@ class DataFeed:
         spread = await self.broker.get_live_spread(pair)
         if spread > self.spread_filter_pips:
             logger.warning(
-                f"[DataFeed] {pair}: spread {spread} pips > filter {self.spread_filter_pips} — skipped"
+                f"[DataFeed] {pair}: spread {spread} pips"
+                f" > filter {self.spread_filter_pips} — skipped"
             )
             return
 

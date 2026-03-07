@@ -9,12 +9,22 @@
 
 import pytest
 
-
 # Mirror Python du OrderManager Cython
 
+
 class OrderSpec:
-    def __init__(self, pair, direction, entry_price, sl_price, tp_price,
-                 sl_pips, tp_pips, lot_size, price_decimals):
+    def __init__(
+        self,
+        pair,
+        direction,
+        entry_price,
+        sl_price,
+        tp_price,
+        sl_pips,
+        tp_pips,
+        lot_size,
+        price_decimals,
+    ):
         self.pair = pair
         self.direction = direction
         self.entry_price = entry_price

@@ -8,9 +8,14 @@
 # ============================================================
 
 import pytest
+
 from trading_d1_bougie.tests.test_entry_validator_valid import (
-    EntryValidator, TrendBias, StructureSignal, StructureType,
-    ValidationStatus, _make_d1
+    EntryValidator,
+    StructureSignal,
+    StructureType,
+    TrendBias,
+    ValidationStatus,
+    _make_d1,
 )
 
 

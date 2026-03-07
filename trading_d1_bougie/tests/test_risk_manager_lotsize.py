@@ -7,8 +7,9 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-import pytest
 from enum import Enum
+
+import pytest
 
 
 class RiskCheckResult(Enum):
@@ -18,8 +19,9 @@ class RiskCheckResult(Enum):
 
 
 class RiskManager:
-    def __init__(self, risk_pct=1.0, daily_loss_limit_pct=3.0,
-                 max_open_pairs=1, lot_type="mini"):
+    def __init__(
+        self, risk_pct=1.0, daily_loss_limit_pct=3.0, max_open_pairs=1, lot_type="mini"
+    ):
         self.risk_pct = risk_pct
         self.daily_loss_limit_pct = daily_loss_limit_pct
         self.max_open_pairs = max_open_pairs

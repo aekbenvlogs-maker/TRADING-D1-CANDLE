@@ -7,7 +7,6 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-import pytest
 from enum import Enum
 
 
@@ -18,7 +17,9 @@ class StructureType(Enum):
 
 
 class StructureSignal:
-    def __init__(self, signal_type, trigger_price=0.0, trigger_index=-1, direction="NONE"):
+    def __init__(
+        self, signal_type, trigger_price=0.0, trigger_index=-1, direction="NONE"
+    ):
         self.signal_type = signal_type
         self.trigger_price = trigger_price
         self.trigger_index = trigger_index
@@ -37,23 +38,35 @@ class StructureDetector:
 
         last_swing_high = swing_highs[-1]["price"]
         last_swing_low = swing_lows[-1]["price"]
-        prev_swing_high = swing_highs[-2]["price"] if len(swing_highs) >= 2 else last_swing_high
-        prev_swing_low = swing_lows[-2]["price"] if len(swing_lows) >= 2 else last_swing_low
+        prev_swing_high = (
+            swing_highs[-2]["price"] if len(swing_highs) >= 2 else last_swing_high
+        )
+        prev_swing_low = (
+            swing_lows[-2]["price"] if len(swing_lows) >= 2 else last_swing_low
+        )
 
         if current_trend == "BULLISH" and body_high > last_swing_high:
-            return StructureSignal(StructureType.BOS, last_candle["close"], last_idx, "BULLISH")
+            return StructureSignal(
+                StructureType.BOS, last_candle["close"], last_idx, "BULLISH"
+            )
         if current_trend == "BEARISH" and body_low < last_swing_low:
-            return StructureSignal(StructureType.BOS, last_candle["close"], last_idx, "BEARISH")
+            return StructureSignal(
+                StructureType.BOS, last_candle["close"], last_idx, "BEARISH"
+            )
         if current_trend == "BULLISH" and body_low < prev_swing_low:
-            return StructureSignal(StructureType.CHOCH, last_candle["close"], last_idx, "BEARISH")
+            return StructureSignal(
+                StructureType.CHOCH, last_candle["close"], last_idx, "BEARISH"
+            )
         if current_trend == "BEARISH" and body_high > prev_swing_high:
-            return StructureSignal(StructureType.CHOCH, last_candle["close"], last_idx, "BULLISH")
+            return StructureSignal(
+                StructureType.CHOCH, last_candle["close"], last_idx, "BULLISH"
+            )
 
         return StructureSignal(StructureType.NONE)
 
 
-def _c(o, c, h=None, l=None):
-    return {"open": o, "close": c, "high": h or max(o, c), "low": l or min(o, c)}
+def _c(o, c, h=None, low_=None):
+    return {"open": o, "close": c, "high": h or max(o, c), "low": low_ or min(o, c)}
 
 
 class TestStructureDetectorBOS:
@@ -93,7 +106,8 @@ class TestStructureDetectorBOS:
         swing_highs = [{"index": 0, "price": 1.0906}, {"index": 0, "price": 1.0910}]
         swing_lows = [{"index": 0, "price": 1.0895}, {"index": 0, "price": 1.0898}]
 
-        # Bougie dont la mèche dépasse mais le body non (open=1.0907, close=1.0905 < swing_high=1.0910)
+        # Bougie dont la mèche dépasse mais le body non
+        # (open=1.0907, close=1.0905 < swing_high=1.0910)
         candles.append({"open": 1.0907, "close": 1.0905, "high": 1.0912, "low": 1.0904})
         result = self.detector.detect(candles, swing_highs, swing_lows, "BULLISH")
 

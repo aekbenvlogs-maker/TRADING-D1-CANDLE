@@ -8,6 +8,7 @@
 # ============================================================
 
 import pytest
+
 from trading_d1_bougie.tests.test_order_manager_eurusd import OrderManager
 
 

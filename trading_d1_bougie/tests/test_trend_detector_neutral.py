@@ -7,8 +7,11 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-import pytest
-from trading_d1_bougie.tests.test_trend_detector_bullish import TrendBias, TrendDetector, _make_candle
+from trading_d1_bougie.tests.test_trend_detector_bullish import (
+    TrendBias,
+    TrendDetector,
+    _make_candle,
+)
 
 
 class TestTrendDetectorNeutral:
@@ -19,7 +22,9 @@ class TestTrendDetectorNeutral:
 
     def test_neutral_on_insufficient_candles(self):
         """Trop peu de bougies → NEUTRAL."""
-        candles = [_make_candle(1.1000 + i * 0.0001, 1.0990 + i * 0.0001) for i in range(5)]
+        candles = [
+            _make_candle(1.1000 + i * 0.0001, 1.0990 + i * 0.0001) for i in range(5)
+        ]
         result = self.detector.detect(candles)
         assert result == TrendBias.NEUTRAL
 

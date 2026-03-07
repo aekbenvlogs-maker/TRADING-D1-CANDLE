@@ -8,6 +8,7 @@
 # ============================================================
 
 import pytest
+
 from trading_d1_bougie.tests.test_d1_range_builder_normal import D1RangeBuilder
 
 
@@ -37,11 +38,14 @@ class TestD1RangeBuilderFibo:
         expected_width = height * 2 * 5.0 / 100.0
         assert zone_width == pytest.approx(expected_width, abs=1e-7)
 
-    @pytest.mark.parametrize("high,low", [
-        (1.20000, 1.19000),
-        (1.35500, 1.34200),
-        (150.000, 148.500),
-    ])
+    @pytest.mark.parametrize(
+        "high,low",
+        [
+            (1.20000, 1.19000),
+            (1.35500, 1.34200),
+            (150.000, 148.500),
+        ],
+    )
     def test_midpoint_parametrized(self, high, low):
         """Le midpoint est (high + low) / 2 pour toutes les paires."""
         d1 = self.builder.build("TEST", d1_high=high, d1_low=low)

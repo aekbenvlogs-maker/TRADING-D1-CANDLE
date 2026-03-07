@@ -8,6 +8,7 @@
 # ============================================================
 
 import pytest
+
 from trading_d1_bougie.tests.test_d1_range_builder_normal import D1RangeBuilder
 
 

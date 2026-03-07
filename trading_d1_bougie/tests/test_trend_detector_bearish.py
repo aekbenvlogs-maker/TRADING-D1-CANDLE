@@ -7,8 +7,11 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-import pytest
-from trading_d1_bougie.tests.test_trend_detector_bullish import TrendBias, TrendDetector, _make_candle
+from trading_d1_bougie.tests.test_trend_detector_bullish import (
+    TrendBias,
+    TrendDetector,
+    _make_candle,
+)
 
 
 def _bearish_candles():

@@ -8,6 +8,7 @@
 # ============================================================
 
 import pytest
+
 from trading_d1_bougie.tests.test_order_manager_eurusd import OrderManager
 
 
@@ -42,9 +43,13 @@ class TestOrderManagerBracket:
     def test_bracket_long_sl_above_entry_raises(self):
         """LONG avec SL au-dessus de l'entrée → ValueError."""
         with pytest.raises(ValueError):
-            self.mgr.build("EURUSD", "LONG", 1.0900, 1.0950, 0.1)  # SL > entry pour LONG
+            self.mgr.build(
+                "EURUSD", "LONG", 1.0900, 1.0950, 0.1
+            )  # SL > entry pour LONG
 
     def test_bracket_short_sl_below_entry_raises(self):
         """SHORT avec SL en-dessous de l'entrée → ValueError."""
         with pytest.raises(ValueError):
-            self.mgr.build("EURUSD", "SHORT", 1.0950, 1.0900, 0.1)  # SL < entry pour SHORT
+            self.mgr.build(
+                "EURUSD", "SHORT", 1.0950, 1.0900, 0.1
+            )  # SL < entry pour SHORT
