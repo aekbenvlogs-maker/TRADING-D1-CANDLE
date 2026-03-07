@@ -11,9 +11,11 @@
 import asyncio
 import os
 import sys
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import httpx
 import yaml
 from dotenv import load_dotenv
 from loguru import logger
@@ -28,6 +30,24 @@ from trading_d1_bougie.engine.data_feed import DataFeed
 from trading_d1_bougie.engine.session_manager import SessionManager
 
 console = Console()
+UTC = timezone.utc
+
+
+async def _send_telegram(message: str) -> None:
+    """Envoie une alerte Telegram. Silencieux si les vars d'env ne sont pas définies."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        return
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                url,
+                json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[Telegram] Échec envoi alerte : {exc}")
 
 
 def _load_config() -> dict[str, Any]:
@@ -70,6 +90,35 @@ def _check_paper_mode() -> None:
         console.print("[green]✅ Mode PAPER TRADING activé (port 4002)[/green]")
 
 
+async def _maybe_refresh_d1_ranges(
+    broker: BrokerAPI,
+    d1_builder: Any,
+    d1_ranges: dict[str, Any],
+    dashboard: Any,
+    pairs: list[str],
+    last_refresh: date,
+) -> date:
+    """Rafraîchit les ranges D1 si la date UTC a changé depuis le dernier refresh."""
+    today = datetime.now(UTC).date()
+    if today == last_refresh:
+        return last_refresh
+    for pair in pairs:
+        try:
+            candle = await broker.get_d1_candle(pair)
+            if candle:
+                d1_ranges[pair] = d1_builder.build(pair, candle["high"], candle["low"])
+                dashboard.update_pair(
+                    pair,
+                    d1_high=d1_ranges[pair].high,
+                    d1_low=d1_ranges[pair].low,
+                    d1_mid=d1_ranges[pair].mid,
+                )
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"[Main] D1 refresh error for {pair}: {exc}")
+    logger.info(f"[Main] 🔄 D1 ranges rafraîchis pour {pairs} ({today})")
+    return today
+
+
 async def _main_loop(
     broker: BrokerAPI,
     data_feed: DataFeed,
@@ -107,34 +156,63 @@ async def _main_loop(
 
     pairs = strategy["pairs"]
     d1_ranges: dict[str, Any] = {}
-    equity_start: float = 10_000.0  # À récupérer depuis le compte IB
-    open_pairs: list[str] = []
+    open_pairs: dict[str, int] = {}   # pair → IB orderId
     daily_trade_count: dict[str, int] = {p: 0 for p in pairs}
+    last_d1_refresh: date = date.min
+    previous_date: date = date.min
+
+    # Callback IB : retire la paire d'open_pairs quand la position se ferme
+    def _on_order_status(trade: Any) -> None:  # noqa: ANN001
+        if trade.orderStatus.status in ("Filled", "Cancelled", "Inactive"):
+            for pair_key, oid in list(open_pairs.items()):
+                if oid == trade.order.orderId:
+                    del open_pairs[pair_key]
+                    logger.info(
+                        f"[Main] 🔒 Position fermée, retiré d'open_pairs : {pair_key}"
+                    )
+                    break
+
+    broker.ib.orderStatusEvent += _on_order_status
 
     logger.info("[Main] 🚀 Starting main loop…")
+
+    # ---------------------------------------------------------------- #
+    # Récupérer l'equity initiale depuis IB                           #
+    # ---------------------------------------------------------------- #
+    equity_start: float = await broker.fetch_equity()
+    equity_current: float = equity_start
+    logger.info(f"[Main] 💰 Equity initiale : ${equity_start:,.2f}")
 
     with dashboard.start_live() as live:
         # ---------------------------------------------------------------- #
         # Étape 1 — Construire les rectangles D1 au démarrage             #
         # ---------------------------------------------------------------- #
-        for pair in pairs:
-            try:
-                candle = await broker.get_d1_candle(pair)
-                if candle:
-                    d1_ranges[pair] = d1_builder.build(
-                        pair, candle["high"], candle["low"]
-                    )
-                    dashboard.update_pair(
-                        pair,
-                        d1_high=d1_ranges[pair].high,
-                        d1_low=d1_ranges[pair].low,
-                        d1_mid=d1_ranges[pair].mid,
-                    )
-            except Exception as exc:  # noqa: BLE001
-                logger.error(f"[Main] D1 build error for {pair}: {exc}")
+        last_d1_refresh = await _maybe_refresh_d1_ranges(
+            broker, d1_builder, d1_ranges, dashboard, pairs, last_d1_refresh
+        )
 
         while True:
             now_utc = session_mgr.now_utc()
+
+            # -------------------------------------------------------- #
+            # Refresh D1 si nouvelle journée + reset compteurs         #
+            # -------------------------------------------------------- #
+            last_d1_refresh = await _maybe_refresh_d1_ranges(
+                broker, d1_builder, d1_ranges, dashboard, pairs, last_d1_refresh
+            )
+            today = datetime.now(UTC).date()
+            if today != previous_date:
+                daily_trade_count = {p: 0 for p in pairs}
+                previous_date = today
+                logger.info("[Main] 🗓️ Nouvelle journée — compteurs remis à zéro")
+
+            # -------------------------------------------------------- #
+            # Mise à jour equity courante                              #
+            # -------------------------------------------------------- #
+            try:
+                equity_current = await broker.fetch_equity()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"[Main] Equity fetch failed : {exc}")
 
             if not session_mgr.is_active_session(now_utc):
                 logger.debug("[Main] Outside active session — waiting…")
@@ -200,14 +278,19 @@ async def _main_loop(
                     continue
 
                 # -------------------------------------------------------- #
+                # -------------------------------------------------------- #
                 # Risk checks                                               #
                 # -------------------------------------------------------- #
-                equity_current = equity_start  # TODO: récupérer depuis broker
                 if (
                     risk_manager.check_daily_limit(equity_start, equity_current)
                     != RiskCheckResult.ALLOWED
                 ):
+                    msg = (
+                        f"⚠️ <b>DAILY LIMIT ATTEINT</b>\n"
+                        f"Trading suspendu — equity: ${equity_current:,.2f}"
+                    )
                     logger.warning("[Main] Daily loss limit reached — SHUTDOWN")
+                    await _send_telegram(msg)
                     return
 
                 if (
@@ -219,17 +302,34 @@ async def _main_loop(
                     )
                     continue
 
+                if pair in open_pairs:
+                    logger.debug(f"[Main] {pair} already in open_pairs — skip")
+                    continue
+
                 # -------------------------------------------------------- #
-                # Étape 5 — Construire et envoyer l'ordre                 #
+                # Étape 5 — Sizing avec SL réel                           #
                 # -------------------------------------------------------- #
-                swing_sl = (
+                swing_sl: float = (
                     d1_ranges[pair].low
                     if validation.direction == "LONG"
                     else d1_ranges[pair].high
                 )
+                pip_size: float = 0.01 if "JPY" in pair else 0.0001
+                real_sl_pips: float = round(abs(price - swing_sl) / pip_size, 1)
+
+                if real_sl_pips <= 0:
+                    logger.warning(f"[Main] ⚠️ {pair} — sl_pips=0, skip")
+                    continue
+
                 lot_size = risk_manager.calculate_lot_size(
-                    equity=equity_start, sl_pips=10.0, pair=pair  # sl_pips estimé
+                    equity=equity_current,
+                    sl_pips=real_sl_pips,
+                    pair=pair,
                 )
+
+                # -------------------------------------------------------- #
+                # Étape 6 — Construire et envoyer l'ordre bracket          #
+                # -------------------------------------------------------- #
                 order_spec = order_manager.build(
                     pair=pair,
                     direction=validation.direction,
@@ -237,13 +337,30 @@ async def _main_loop(
                     swing_sl_price=swing_sl,
                     lot_size=lot_size,
                 )
-                logger.info(f"[Main] 🎯 ORDER: {order_spec}")
-                # TODO: broker.place_bracket_order(order_spec)
+                logger.info(f"[Main] 🎯 Sending order: {order_spec}")
 
-                open_pairs.append(pair)
+                order_id = await broker.place_bracket_order(order_spec)
+                open_pairs[pair] = order_id
                 daily_trade_count[pair] += 1
 
-            await asyncio.sleep(30)
+                logger.info(
+                    f"[Main] ✅ Bracket order placed — ID:{order_id} | "
+                    f"{pair} {validation.direction} @ {price} | "
+                    f"SL={order_spec.sl_price} ({real_sl_pips:.1f}p) | "
+                    f"TP={order_spec.tp_price} | lots={lot_size}"
+                )
+                await _send_telegram(
+                    f"🎯 <b>NEW TRADE</b>\n"
+                    f"Paire: {pair}\n"
+                    f"Direction: {validation.direction}\n"
+                    f"Entry: {order_spec.entry_price}\n"
+                    f"SL: {order_spec.sl_price} ({real_sl_pips:.1f} pips)\n"
+                    f"TP: {order_spec.tp_price}\n"
+                    f"Lots: {order_spec.lot_size}\n"
+                    f"Equity: ${equity_current:,.2f}"
+                )
+
+                        await asyncio.sleep(30)
             live.update(dashboard.render())
 
 
@@ -273,6 +390,11 @@ async def _connect_with_retry(
                 f"[Main] IB Gateway non disponible (tentative {attempt}) : {exc}\n"
                 f"       → Retry dans {delay:.0f}s … (Ctrl+C pour quitter)"
             )
+            if attempt == 1:
+                import asyncio as _asyncio
+                _asyncio.ensure_future(
+                    _send_telegram("🔴 <b>DÉCONNEXION IB GATEWAY</b>\nTentative de reconnexion...")
+                )
             if max_attempts > 0 and attempt >= max_attempts:
                 logger.error("[Main] Nombre maximum de tentatives atteint")
                 return False

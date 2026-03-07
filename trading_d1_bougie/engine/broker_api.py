@@ -185,6 +185,98 @@ class BrokerAPI:
         ]
         return candles
 
+    async def place_bracket_order(self, order_spec: Any) -> int:
+        """
+        Place un bracket order (entry limit + TP limit + SL stop) sur IB Gateway.
+
+        Args:
+            order_spec: OrderSpec Cython avec entry_price, sl_price, tp_price,
+                        lot_size, direction, pair.
+
+        Returns:
+            orderId de l'ordre parent (int).
+
+        Raises:
+            RuntimeError: si le contrat ne peut pas être qualifié par IB.
+        """
+        from ib_insync import Forex, LimitOrder, StopOrder
+
+        base = order_spec.pair[:3]
+        quote = order_spec.pair[3:]
+        contract = Forex(f"{base}{quote}")
+        qualified = await self.ib.qualifyContractsAsync(contract)
+        if not qualified:
+            raise RuntimeError(
+                f"[BrokerAPI] ❌ Contrat non qualifié : {order_spec.pair}"
+            )
+
+        action = "BUY" if order_spec.direction == "LONG" else "SELL"
+        close_action = "SELL" if action == "BUY" else "BUY"
+
+        parent_id = self.ib.client.getReqId()
+        tp_id = self.ib.client.getReqId()
+        sl_id = self.ib.client.getReqId()
+
+        # Ordre parent — limit entry
+        parent = LimitOrder(
+            action=action,
+            totalQuantity=order_spec.lot_size,
+            lmtPrice=order_spec.entry_price,
+            orderId=parent_id,
+            transmit=False,
+            tif="DAY",
+        )
+
+        # Take profit — limit
+        take_profit = LimitOrder(
+            action=close_action,
+            totalQuantity=order_spec.lot_size,
+            lmtPrice=order_spec.tp_price,
+            orderId=tp_id,
+            parentId=parent_id,
+            transmit=False,
+            tif="GTC",
+        )
+
+        # Stop loss — stop (transmet le groupe entier)
+        stop_loss = StopOrder(
+            action=close_action,
+            totalQuantity=order_spec.lot_size,
+            stopPrice=order_spec.sl_price,
+            orderId=sl_id,
+            parentId=parent_id,
+            transmit=True,
+            tif="GTC",
+        )
+
+        for order in [parent, take_profit, stop_loss]:
+            trade = self.ib.placeOrder(contract, order)
+            logger.info(
+                f"[BrokerAPI] 📤 Order placed: {trade.order.orderId} — "
+                f"{trade.order.action} @ "
+                f"{trade.order.lmtPrice or trade.order.stopPrice}"
+            )
+
+        return parent_id
+
+    async def fetch_equity(self) -> float:
+        """
+        Retourne la valeur nette du compte IB en USD (NetLiquidation).
+
+        Returns:
+            float: equity en USD.
+
+        Raises:
+            RuntimeError: si IB ne retourne pas la valeur NetLiquidation.
+        """
+        summary = await self.ib.accountSummaryAsync()
+        for item in summary:
+            if item.tag == "NetLiquidation" and item.currency == "USD":
+                return float(item.value)
+        raise RuntimeError(
+            "[BrokerAPI] ❌ Impossible de récupérer l'equity (NetLiquidation) depuis IB Gateway"
+        )
+
     async def get_live_spread(self, pair: str) -> float:
         """
         Retourne le spread actuel en pips.
