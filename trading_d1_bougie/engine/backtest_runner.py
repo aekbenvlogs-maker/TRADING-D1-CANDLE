@@ -111,7 +111,32 @@ class BacktestRunner:
 
         return d1_df, m15_df
 
-    def _simulate_signals(
+    @staticmethod
+    def _simulate_trade_result(
+        direction: str,
+        tp_price: float,
+        sl_price: float,
+        subsequent_bars: "pd.DataFrame",
+    ) -> str:
+        """Simule si TP ou SL est touché en premier sur les bougies suivantes.
+
+        Returns:
+            'TP' | 'SL' | 'OPEN'
+        """
+        for _, bar in subsequent_bars.iterrows():
+            if direction == "LONG":
+                if bar["high"] >= tp_price:
+                    return "TP"
+                if bar["low"] <= sl_price:
+                    return "SL"
+            else:  # SHORT
+                if bar["low"] <= tp_price:
+                    return "TP"
+                if bar["high"] >= sl_price:
+                    return "SL"
+        return "OPEN"
+
+        def _simulate_signals(
         self, d1_df: pd.DataFrame, m15_df: pd.DataFrame, pair: str
     ) -> pd.DataFrame:
         """
@@ -182,6 +207,12 @@ class BacktestRunner:
                 if sl_pips <= 0:
                     continue
 
+                # Simuler TP/SL sur les bougies suivantes du même jour
+                subsequent = day_m15.iloc[j + 1 :]
+                result = BacktestRunner._simulate_trade_result(
+                    direction, tp, sl, subsequent
+                )
+
                 records.append(
                     {
                         "date": day_m15.index[j],
@@ -191,6 +222,7 @@ class BacktestRunner:
                         "tp": tp,
                         "sl_pips": sl_pips,
                         "tp_pips": tp_pips,
+                        "result": result,
                     }
                 )
                 break  # 1 trade max par jour
@@ -204,12 +236,14 @@ class BacktestRunner:
         if trades.empty:
             return {"error": "No trades generated"}
 
-        wins = (trades["tp_pips"] > 0).sum()
-        total = len(trades)
-        winrate = wins / total * 100
+        closed = trades[trades["result"].isin(["TP", "SL"])]
+        wins = (closed["result"] == "TP").sum()
+        losses = (closed["result"] == "SL").sum()
+        total = len(closed)
+        winrate = (wins / total * 100) if total > 0 else 0.0
 
-        gross_profit = trades[trades["tp_pips"] > 0]["tp_pips"].sum()
-        gross_loss = abs(trades[trades["tp_pips"] <= 0]["sl_pips"].sum())
+        gross_profit = closed[closed["result"] == "TP"]["tp_pips"].sum()
+        gross_loss = closed[closed["result"] == "SL"]["sl_pips"].sum()
         profit_factor = gross_profit / gross_loss if gross_loss > 0 else float("inf")
 
         # Courbe d'equity simplifiée (1% risk, RR 2)

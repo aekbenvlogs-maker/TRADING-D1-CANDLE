@@ -169,9 +169,8 @@ class StandaloneBacktester:
         self.pairs: list[str] = strategy["pairs"]
         self.rr_ratio: float = float(strategy["rr_ratio"])
         self.risk_pct: float = float(strategy["risk_pct"])
-        # Backtest utilise un buffer de proximité élargi (30%)
-        # pour simuler les entrées réalistes dans la moitié haute/basse du range
-        self.proximity_buffer_pct: float = 30.0
+        # Buffer de proximité aligné sur config.yaml (10%)
+        self.proximity_buffer_pct: float = float(strategy["proximity_buffer_pct"])
         self.fibo_forbidden_pct: float = float(strategy["fibo_forbidden_zone_pct"])
         self.spread_filter_pips: float = float(strategy["spread_filter_pips"])
         self.daily_loss_limit_pct: float = float(risk_cfg["daily_loss_limit_pct"])
@@ -183,10 +182,7 @@ class StandaloneBacktester:
         )
         self.trend_detector = TrendDetector()
         self.structure_detector = StructureDetector()
-        self.entry_validator = EntryValidator(
-            proximity_buffer_pct=self.proximity_buffer_pct,
-            fibo_forbidden_pct=self.fibo_forbidden_pct,
-        )
+        self.entry_validator = EntryValidator()
         self.order_manager = OrderManager(rr_ratio=self.rr_ratio)
         self.risk_manager = RiskManager(
             risk_pct=self.risk_pct,
@@ -288,7 +284,11 @@ class StandaloneBacktester:
 
             # Prix d'entrée = close de la dernière bougie M15, ramené dans D1 range
             raw_price = m15_window[-1]["close"]
-            price = max(d1_low, min(d1_high, raw_price))
+            price = raw_price
+
+            # Guard explicite : skip si le prix est sorti du range D1
+            if not (d1_low <= price <= d1_high):
+                continue
 
             # Valider l'entrée via EntryValidator
             validation = self.entry_validator.validate(price, d1_range, trend, structure)
@@ -330,14 +330,13 @@ class StandaloneBacktester:
             # Générer 32 bars futurs pour simuler le résultat TP/SL.
             # Un léger biais directionnel (0.4σ) simule le fait que la
             # stratégie trade dans la direction de la tendance (BOS confirmé).
-            is_long_trade = direction in ("LONG", "long", "BUY")
-            drift_bias = sigma_m15 * 0.40 if is_long_trade else -sigma_m15 * 0.40
+            # GBM neutre — aucun biais directionnel (simulation honnête)
             future_candles = generate_m15_session(
                 start_price=price,
                 sigma_m15=sigma_m15,
                 n_bars=48,  # fenêtre plus large → moins de trades OPEN
                 seed=day_idx * 2741,
-                drift_bias=drift_bias,
+                drift_bias=0.0,   # GBM neutre — aucun look-forward bias
             )
 
             result = _simulate_trade_result(
