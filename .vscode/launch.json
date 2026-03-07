@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "▶ TRADING-D1-BOUGIE — Paper Trading",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "trading_d1_bougie.engine.main",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "▶ Backtest Runner",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "trading_d1_bougie.engine.backtest_runner",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "🧪 Pytest — All Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["trading_d1_bougie/tests", "-v", "--cov=trading_d1_bougie"],
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/.venv/bin/python",
+      "console": "integratedTerminal"
+    }
+  ]
+}

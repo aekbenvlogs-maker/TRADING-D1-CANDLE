@@ -1,0 +1,14 @@
+[tool.black]
+line-length = 88
+target-version = ["py311"]
+
+[tool.ruff]
+target-version = "py311"
+select = ["E", "F", "W", "I", "N", "UP"]
+line-length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["trading_d1_bougie/tests"]
+verbose = true
+asyncio_mode = "auto"
+addopts = "--cov=trading_d1_bougie --cov-report=html:TRADING_D1_BOUGIE_coverage_report.html"

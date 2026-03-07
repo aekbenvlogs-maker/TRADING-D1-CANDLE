@@ -1,0 +1,17 @@
+.env
+.venv/
+*.pyc
+__pycache__/
+trading_d1_bougie/logs/*.log
+build/
+*.so
+*.c
+dist/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+TRADING_D1_BOUGIE_coverage_report.html
+htmlcov/
+TRADING_D1_BOUGIE_backtest_results.csv
+TRADING_D1_BOUGIE_equity_curve.png

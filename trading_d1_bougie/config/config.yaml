@@ -1,0 +1,29 @@
+# TRADING-D1-BOUGIE — Configuration Stratégie
+strategy:
+  pairs: ["EURUSD", "GBPUSD", "USDJPY"]
+  rr_ratio: 2.0
+  risk_pct: 1.0
+  max_daily_trades: 2
+  proximity_buffer_pct: 10.0      # % de la hauteur du rectangle
+  fibo_forbidden_zone_pct: 5.0    # ± % autour du midpoint
+  spread_filter_pips: 2.0
+  lot_type: "mini"                # standard / mini / micro
+
+risk:
+  daily_loss_limit_pct: 3.0
+  max_open_pairs: 1
+
+broker:
+  host: "127.0.0.1"
+  port_paper: 4002
+  port_live: 4001
+  account_type: "Individual"
+
+session:
+  timezone: "Europe/Paris"
+  active_sessions: ["london", "new_york"]
+
+logging:
+  rotation: "1 day"
+  retention: "30 days"
+  level: "INFO"

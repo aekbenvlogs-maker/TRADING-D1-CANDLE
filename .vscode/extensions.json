@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.pylance",
+    "charliermarsh.ruff",
+    "ms-python.black-formatter",
+    "ms-python.mypy-type-checker",
+    "lextudio.restructuredtext",
+    "eamodio.gitlens",
+    "redhat.vscode-yaml",
+    "mikestead.dotenv"
+  ]
+}
