@@ -180,7 +180,7 @@ class StandaloneBacktester:
             fibo_forbidden_pct=self.fibo_forbidden_pct,
             proximity_buffer_pct=self.proximity_buffer_pct,
         )
-        self.trend_detector = TrendDetector()
+        self.trend_detector = TrendDetector(swing_lookback=cfg["strategy"].get("swing_lookback", 5))
         self.structure_detector = StructureDetector()
         self.entry_validator = EntryValidator()
         self.order_manager = OrderManager(rr_ratio=self.rr_ratio)
@@ -327,7 +327,11 @@ class StandaloneBacktester:
                 continue
 
             # Construire l'ordre (calcule TP via RR ratio)
-            spec = self.order_manager.build(pair, direction, price, swing_sl_price, lot_size)
+            # S2: TP dynamique vers l'opposé D1
+            _d1_tgt = d1_range.high if direction in ("LONG", "long", "BUY") else d1_range.low
+            spec = self.order_manager.build(
+                pair, direction, price, swing_sl_price, lot_size, _d1_tgt
+            )
             tp_price = spec.tp_price
             sl_actual = spec.sl_price
 

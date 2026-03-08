@@ -119,6 +119,40 @@ async def _maybe_refresh_d1_ranges(
     return today
 
 
+async def _calculate_d1_atr(
+    broker: "BrokerAPI",
+    pair: str,
+    period: int = 14,
+) -> float:
+    """Calcule l’ATR(14) sur les bougies D1 récentes via IB.
+
+    Retourne 0.0 si les données sont insuffisantes (ne bloque pas le trading).
+    """
+    try:
+        contract = broker._get_contract(pair)
+        bars = await broker.ib.reqHistoricalDataAsync(
+            contract=contract,
+            endDateTime="",
+            durationStr="20 D",
+            barSizeSetting="1 day",
+            whatToShow="MIDPOINT",
+            useRTH=False,
+        )
+        if len(bars) < period:
+            return 0.0
+        true_ranges = []
+        for i in range(1, len(bars)):
+            high = bars[i].high
+            low = bars[i].low
+            prev_close = bars[i - 1].close
+            tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
+            true_ranges.append(tr)
+        return sum(true_ranges[-period:]) / period
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"[Main] ATR D1 {pair} non disponible : {exc}")
+        return 0.0
+
+
 async def _cancel_orphan_gtc_orders(
     broker: "BrokerAPI",
 ) -> int:
@@ -153,7 +187,27 @@ async def _cancel_orphan_gtc_orders(
     return cancelled
 
 
+async def _send_daily_summary(
+    daily_trade_count: dict,
+    equity_start: float,
+    equity_current: float,
+) -> None:
+    """Envoie le résumé journalier via Telegram à 23h55 UTC."""
+    pnl_usd = equity_current - equity_start
+    pnl_pct = (pnl_usd / equity_start) * 100 if equity_start > 0 else 0.0
+    trades_today = sum(daily_trade_count.values())
+    sign = "+" if pnl_usd >= 0 else ""
+    await _send_telegram(
+        f"📊 <b>RÉSUMÉ JOURNALIER</b>\n"
+        f"Trades : {trades_today}\n"
+        f"P&L : {sign}{pnl_usd:.2f}$ ({sign}{pnl_pct:.2f}%)\n"
+        "Equity : $"
+        f"{equity_current:,.2f}"
+    )
+
+
 async def _rebuild_open_pairs(broker: "BrokerAPI") -> "dict[str, int]":
+
 
     """Reconstruit open_pairs depuis les trades IB actifs au démarrage.
 
@@ -210,7 +264,7 @@ async def _main_loop(
         fibo_forbidden_pct=strategy["fibo_forbidden_zone_pct"],
         proximity_buffer_pct=strategy["proximity_buffer_pct"],
     )
-    trend_detector = TrendDetector()
+    trend_detector = TrendDetector(swing_lookback=cfg["strategy"].get("swing_lookback", 5))
     structure_detector = StructureDetector()
     entry_validator = EntryValidator()
     order_manager = OrderManager(rr_ratio=strategy["rr_ratio"])
@@ -223,6 +277,7 @@ async def _main_loop(
 
     pairs = strategy["pairs"]
     d1_ranges: dict[str, Any] = {}
+    _d1_atr_cache: dict[str, float] = {}  # S3: ATR D1 par paire
     # C3: Reconstruire open_pairs depuis les trades IB actifs (survie au redémarrage)
     open_pairs: dict[str, int] = await _rebuild_open_pairs(broker)
     # M7: Annuler les ordres GTC orphelins (enfants sans parent actif)
@@ -234,6 +289,7 @@ async def _main_loop(
     )
     session_mgr.load_news_calendar(_news_csv)
     daily_trade_count: dict[str, int] = {p: 0 for p in pairs}
+    _daily_summary_sent: bool = False  # S5: flag envoi résumé journalier
     last_d1_refresh: date = date.min
     previous_date: date = date.min
 
@@ -276,6 +332,9 @@ async def _main_loop(
             last_d1_refresh = await _maybe_refresh_d1_ranges(
                 broker, d1_builder, d1_ranges, dashboard, pairs, last_d1_refresh
             )
+            # S3: Recalculer ATR D1 après chaque refresh
+            for _atr_pair in pairs:
+                _d1_atr_cache[_atr_pair] = await _calculate_d1_atr(broker, _atr_pair)
             today = datetime.now(UTC).date()
             if today != previous_date:
                 daily_trade_count = {p: 0 for p in pairs}
@@ -333,6 +392,16 @@ async def _main_loop(
                     logger.debug(
                         f"[Main] ⏭️ {pair} — range D1 trop étroit "
                         f"({_d1_height_pips:.1f}p < {_min_range}p) — skip"
+                    )
+                    continue
+
+                # S3: Filtre ATR D1 — ne pas trader en régime compressé
+                _atr_pips: float = _d1_atr_cache.get(pair, 0.0) / _pip_size_c4
+                _min_atr: float = float(strategy.get("min_atr_d1_pips", 40.0))
+                if 0 < _atr_pips < _min_atr:
+                    logger.info(
+                        f"[Main] 📉 {pair} — ATR D1 trop faible "
+                        f"({_atr_pips:.1f}p < {_min_atr}p) — régime compressé"
                     )
                     continue
 
@@ -443,12 +512,19 @@ async def _main_loop(
                 # -------------------------------------------------------- #
                 # Étape 6 — Construire et envoyer l'ordre bracket          #
                 # -------------------------------------------------------- #
+                # S2: TP dynamique vers l'opposé D1
+                _d1_target: float = (
+                    d1_ranges[pair].high
+                    if validation.direction == "LONG"
+                    else d1_ranges[pair].low
+                )
                 order_spec = order_manager.build(
                     pair=pair,
                     direction=validation.direction,
                     entry_price=price,
                     swing_sl_price=swing_sl,
                     lot_size=lot_size,
+                    d1_target=_d1_target,
                 )
                 logger.info(f"[Main] 🎯 Sending order: {order_spec}")
 
@@ -474,6 +550,15 @@ async def _main_loop(
                 )
 
             live.update(dashboard.render())
+
+            # S5: Résumé journalier à 23h55 UTC
+            _now_utc = datetime.now(UTC)
+            if _now_utc.hour == 23 and _now_utc.minute >= 55 and not _daily_summary_sent:
+                await _send_daily_summary(daily_trade_count, equity_start, equity_current)
+                _daily_summary_sent = True
+            elif _now_utc.hour == 0:
+                _daily_summary_sent = False  # reset pour le lendemain
+
             await asyncio.sleep(30)
 
 

@@ -3,6 +3,8 @@ strategy:
   pairs: ["EURUSD", "GBPUSD", "USDJPY"]
   rr_ratio: 2.0
   risk_pct: 1.0
+  swing_lookback: 5           # Bougies de chaque côté pour valider un swing
+  min_atr_d1_pips: 40.0        # ATR(14) D1 minimum en pips (régime non compressé)
   min_d1_range_pips: 20.0      # Hauteur minimale D1 en pips
   sl_buffer_pips: 3.0         # Buffer sous/sur extrémité D1 pour le SL      # Hauteur minimale D1 en pips pour trader
   max_daily_trades: 2

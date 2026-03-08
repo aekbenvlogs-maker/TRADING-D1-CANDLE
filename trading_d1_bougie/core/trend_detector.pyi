@@ -7,7 +7,7 @@ class TrendBias(Enum):
     NEUTRAL = "NEUTRAL"
 
 class TrendDetector:
-    def __init__(self, swing_lookback: int = 3) -> None: ...
+    def __init__(self, swing_lookback: int = 5) -> None: ...
     def find_swing_highs(
         self,
         candles: list[dict[str, Any]],

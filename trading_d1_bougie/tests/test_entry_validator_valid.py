@@ -57,12 +57,14 @@ class TestEntryValidatorValid:
         assert result.is_valid is True
         assert result.direction == "SHORT"
 
-    def test_valid_choch_also_accepted(self):
-        """Un CHoCH dans le bon sens est aussi valide."""
+    def test_choch_rejected_bos_only_strategy(self):
+        """CHoCH est toujours rejeté — stratégie BOS-only (Sprint 6 M4, Option A)."""
         price = 1.09060
         trend = TrendBias.BULLISH
         signal = StructureSignal(StructureType.CHOCH, direction="BULLISH")
 
         result = self.validator.validate(price, self.d1, trend, signal)
 
-        assert result.is_valid is True
+        # M4: CHoCH explicitement rejeté — BOS-only strategy
+        assert result.is_valid is False
+        assert "BOS-only" in result.reason

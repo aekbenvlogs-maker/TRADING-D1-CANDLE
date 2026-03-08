@@ -69,6 +69,7 @@ cdef class OrderManager:
         double entry_price,
         double swing_sl_price,
         double lot_size,
+        double d1_target = 0.0,    # S2: D1_HIGH (LONG) ou D1_LOW (SHORT), 0=désactivé
     ):
         """
         Construit les niveaux d'un bracket order.
@@ -97,6 +98,7 @@ cdef class OrderManager:
         cdef double tp_price
         cdef double sl_pips
         cdef double tp_pips
+        cdef double tp_d1_pips  # S2: variable mutualisée LONG/SHORT
 
         if direction == "LONG":
             sl_price = round(swing_sl_price - spread_offset, decimals)
@@ -106,6 +108,11 @@ cdef class OrderManager:
                     f"LONG SL must be below entry. sl_pips={sl_pips}"
                 )
             tp_pips = round(sl_pips * self.rr_ratio, 1)
+            # S2: TP dynamique — min(RR fixe, distance vers D1 opposé)
+            if d1_target > 0:
+                tp_d1_pips = round((d1_target - entry_price) / pip, 1)
+                if tp_d1_pips > 0:
+                    tp_pips = min(tp_pips, tp_d1_pips)
             tp_price = round(entry_price + tp_pips * pip, decimals)
         else:  # SHORT
             sl_price = round(swing_sl_price + spread_offset, decimals)
@@ -115,6 +122,11 @@ cdef class OrderManager:
                     f"SHORT SL must be above entry. sl_pips={sl_pips}"
                 )
             tp_pips = round(sl_pips * self.rr_ratio, 1)
+            # S2: TP dynamique — min(RR fixe, distance vers D1 opposé)
+            if d1_target > 0:
+                tp_d1_pips = round((entry_price - d1_target) / pip, 1)
+                if tp_d1_pips > 0:
+                    tp_pips = min(tp_pips, tp_d1_pips)
             tp_price = round(entry_price - tp_pips * pip, decimals)
 
         cdef OrderSpec spec = OrderSpec.__new__(OrderSpec)

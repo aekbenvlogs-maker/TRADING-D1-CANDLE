@@ -9,13 +9,33 @@
 # ============================================================
 
 import asyncio
+import math
 from collections import deque
+from datetime import datetime, timezone
 from collections.abc import Callable
 from typing import Any
 
 from loguru import logger
 
 from trading_d1_bougie.engine.broker_api import BrokerAPI
+
+
+def _seconds_to_next_m15(buffer_secs: float = 5.0) -> float:
+    """Retourne les secondes jusqu’à la prochaine frontière M15 UTC.
+
+    Les frontières M15 sont aux minutes :00, :15, :30, :45 de chaque heure UTC.
+    Un buffer de 5 secondes est ajouté pour s’assurer que la bougie est close.
+    """
+    now = datetime.now(timezone.utc)
+    minutes = now.minute
+    seconds = now.second
+    next_boundary = math.ceil((minutes + seconds / 60) / 15) * 15
+    if next_boundary >= 60:
+        next_boundary -= 60
+        secs_to_next = (60 - minutes + next_boundary) * 60 - seconds
+    else:
+        secs_to_next = (next_boundary - minutes) * 60 - seconds
+    return max(float(secs_to_next) + buffer_secs, buffer_secs)
 
 
 class DataFeed:
@@ -113,9 +133,11 @@ class DataFeed:
     # ------------------------------------------------------------------ #
 
     async def _poll_loop(self, pair: str) -> None:
-        """Boucle de polling toutes les `poll_interval` secondes."""
+        """Boucle de polling alignée sur les frontières M15 UTC."""
         while self._running:
-            await asyncio.sleep(self.poll_interval)
+            wait = _seconds_to_next_m15()
+            logger.debug(f"[DataFeed] {pair} prochaine lecture dans {wait:.0f}s")
+            await asyncio.sleep(wait)
             try:
                 await self._fetch_latest(pair)
             except Exception as exc:  # noqa: BLE001

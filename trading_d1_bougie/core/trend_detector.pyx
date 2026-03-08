@@ -32,7 +32,7 @@ cdef class TrendDetector:
     """
     cdef int swing_lookback
 
-    def __init__(self, int swing_lookback=3):
+    def __init__(self, int swing_lookback=5):
         """
         Args:
             swing_lookback: nombre de bougies de chaque côté pour identifier un swing

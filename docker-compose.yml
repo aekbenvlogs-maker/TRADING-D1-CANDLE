@@ -1,0 +1,27 @@
+# ============================================================
+# TRADING-D1-BOUGIE — Docker Compose
+# ============================================================
+version: "3.9"
+
+services:
+  trading-bot:
+    build: .
+    container_name: trading-d1-candle
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./trading_d1_bougie/logs:/app/trading_d1_bougie/logs
+      - ./trading_d1_bougie/config:/app/trading_d1_bougie/config
+      - ./trading_d1_bougie/data:/app/trading_d1_bougie/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # accès IB Gateway sur l’hôte
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import trading_d1_bougie"]
+      interval: 60s
+      timeout: 10s
+      retries: 3

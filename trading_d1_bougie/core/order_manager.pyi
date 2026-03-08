@@ -23,4 +23,5 @@ class OrderManager:
         entry_price: float,
         swing_sl_price: float,
         lot_size: float,
+        d1_target: float = 0.0,
     ) -> OrderSpec: ...
