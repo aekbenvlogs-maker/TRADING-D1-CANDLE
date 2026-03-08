@@ -7,7 +7,7 @@
 # LAST UPDATED : 2026-03-08
 # ============================================================
 
-from trading_d1_bougie.core.trend_detector import TrendDetector, TrendBias
+from trading_d1_bougie.core.trend_detector import TrendBias, TrendDetector
 from trading_d1_bougie.tests.test_trend_detector_bullish import _make_candle
 
 

@@ -19,16 +19,14 @@ Scénarios couverts :
   5. Chaîne RiskManager ↔ OrderManager : lot size × SL pips cohérent
 """
 
-import math
 import pytest
 
 from trading_d1_bougie.core.d1_range_builder import D1RangeBuilder
 from trading_d1_bougie.core.entry_validator import EntryValidator, ValidationStatus
 from trading_d1_bougie.core.order_manager import OrderManager
-from trading_d1_bougie.core.risk_manager import RiskManager, RiskCheckResult
+from trading_d1_bougie.core.risk_manager import RiskCheckResult, RiskManager
 from trading_d1_bougie.core.structure_detector import StructureDetector, StructureType
-from trading_d1_bougie.core.trend_detector import TrendDetector, TrendBias
-
+from trading_d1_bougie.core.trend_detector import TrendBias, TrendDetector
 
 # ------------------------------------------------------------------ #
 # Fixtures communes                                                    #
@@ -216,7 +214,10 @@ class TestPipelineShort:
 
         # Pour un SHORT: prix près du HIGH → prox_upper = 1.2800 - 0.001 = 1.2790
         # Créer un structure signal BEARISH factice si détecteur retourne NONE
-        from trading_d1_bougie.core.structure_detector import StructureSignal, StructureType
+        from trading_d1_bougie.core.structure_detector import (
+            StructureSignal,
+            StructureType,
+        )
         from trading_d1_bougie.core.trend_detector import TrendBias as TB
         if structure.signal_type == StructureType.NONE:
             structure = StructureSignal(StructureType.BOS, direction="BEARISH")
@@ -267,7 +268,10 @@ class TestPipelineFiboBlocked:
 
     def test_fibo_zone_blocks_entry(self, validator):
         """Prix au midpoint (zone Fibo) → ValidationStatus.INVALID_FIBO_FORBIDDEN_ZONE."""
-        from trading_d1_bougie.core.structure_detector import StructureSignal, StructureType
+        from trading_d1_bougie.core.structure_detector import (
+            StructureSignal,
+            StructureType,
+        )
         from trading_d1_bougie.core.trend_detector import TrendBias
 
         # D1 avec larges zones de proximité (60%) pour que midpoint passe check 2
@@ -349,7 +353,10 @@ class TestD1RangeEntryValidatorIntegration:
     def test_parameterized_entries(
         self, pair, high, low, entry_price, direction, is_valid, validator
     ):
-        from trading_d1_bougie.core.structure_detector import StructureSignal, StructureType
+        from trading_d1_bougie.core.structure_detector import (
+            StructureSignal,
+            StructureType,
+        )
         from trading_d1_bougie.core.trend_detector import TrendBias
 
         b = D1RangeBuilder(fibo_forbidden_pct=5.0, proximity_buffer_pct=10.0)

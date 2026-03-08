@@ -55,3 +55,24 @@ jobs:
           path: |
             coverage.xml
             TRADING_D1_BOUGIE_coverage_report.html
+
+  docker:
+    name: Docker build check
+    runs-on: ubuntu-latest
+    needs: quality
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: trading-d1-candle:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
