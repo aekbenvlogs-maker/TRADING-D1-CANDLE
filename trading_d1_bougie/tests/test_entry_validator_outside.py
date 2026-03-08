@@ -4,19 +4,15 @@
 # DESCRIPTION  : Tests EntryValidator — invalide si hors rectangle D1
 # AUTHOR       : TRADING-D1-BOUGIE Dev Team
 # PYTHON       : 3.11.9
-# LAST UPDATED : 2026-03-07
+# LAST UPDATED : 2026-03-08
 # ============================================================
 
 import pytest
 
-from trading_d1_bougie.tests.test_entry_validator_valid import (
-    EntryValidator,
-    StructureSignal,
-    StructureType,
-    TrendBias,
-    ValidationStatus,
-    _make_d1,
-)
+from trading_d1_bougie.core.entry_validator import EntryValidator, ValidationStatus
+from trading_d1_bougie.core.trend_detector import TrendBias
+from trading_d1_bougie.core.structure_detector import StructureSignal, StructureType
+from trading_d1_bougie.tests.test_entry_validator_valid import _make_d1
 
 
 class TestEntryValidatorOutsideRange:
@@ -32,7 +28,7 @@ class TestEntryValidatorOutsideRange:
             1.10500,
             self.d1,
             TrendBias.BULLISH,
-            StructureSignal(StructureType.BOS, "BULLISH"),
+            StructureSignal(StructureType.BOS, direction="BULLISH"),
         )
         assert result.status == ValidationStatus.INVALID_OUTSIDE_RANGE
         assert result.is_valid is False
@@ -43,7 +39,7 @@ class TestEntryValidatorOutsideRange:
             1.08500,
             self.d1,
             TrendBias.BEARISH,
-            StructureSignal(StructureType.BOS, "BEARISH"),
+            StructureSignal(StructureType.BOS, direction="BEARISH"),
         )
         assert result.status == ValidationStatus.INVALID_OUTSIDE_RANGE
         assert result.is_valid is False
@@ -54,7 +50,7 @@ class TestEntryValidatorOutsideRange:
             1.10001,
             self.d1,
             TrendBias.BULLISH,
-            StructureSignal(StructureType.BOS, "BULLISH"),
+            StructureSignal(StructureType.BOS, direction="BULLISH"),
         )
         assert result.status == ValidationStatus.INVALID_OUTSIDE_RANGE
 
@@ -65,6 +61,6 @@ class TestEntryValidatorOutsideRange:
             price,
             self.d1,
             TrendBias.BULLISH,
-            StructureSignal(StructureType.BOS, "BULLISH"),
+            StructureSignal(StructureType.BOS, direction="BULLISH"),
         )
         assert result.status == ValidationStatus.INVALID_OUTSIDE_RANGE

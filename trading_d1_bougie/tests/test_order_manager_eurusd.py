@@ -4,82 +4,12 @@
 # DESCRIPTION  : Tests OrderManager — calcul SL/TP correct sur EURUSD
 # AUTHOR       : TRADING-D1-BOUGIE Dev Team
 # PYTHON       : 3.11.9
-# LAST UPDATED : 2026-03-07
+# LAST UPDATED : 2026-03-08
 # ============================================================
 
 import pytest
 
-# Mirror Python du OrderManager Cython
-
-
-class OrderSpec:
-    def __init__(
-        self,
-        pair,
-        direction,
-        entry_price,
-        sl_price,
-        tp_price,
-        sl_pips,
-        tp_pips,
-        lot_size,
-        price_decimals,
-    ):
-        self.pair = pair
-        self.direction = direction
-        self.entry_price = entry_price
-        self.sl_price = sl_price
-        self.tp_price = tp_price
-        self.sl_pips = sl_pips
-        self.tp_pips = tp_pips
-        self.lot_size = lot_size
-        self.price_decimals = price_decimals
-
-
-class OrderManager:
-    def __init__(self, rr_ratio=2.0, spread_buffer_pips=0.5):
-        self.rr_ratio = rr_ratio
-        self.spread_buffer_pips = spread_buffer_pips
-
-    def _pip_size(self, pair):
-        return 0.01 if "JPY" in pair.upper() else 0.0001
-
-    def _get_decimals(self, pair):
-        return 2 if "JPY" in pair.upper() else 4
-
-    def build(self, pair, direction, entry_price, swing_sl_price, lot_size):
-        if direction not in ("LONG", "SHORT"):
-            raise ValueError(f"Invalid direction: {direction}")
-        pip = self._pip_size(pair)
-        decimals = self._get_decimals(pair)
-        spread_offset = self.spread_buffer_pips * pip
-
-        if direction == "LONG":
-            sl_price = round(swing_sl_price - spread_offset, decimals)
-            sl_pips = round((entry_price - sl_price) / pip, 1)
-            if sl_pips <= 0:
-                raise ValueError("LONG SL must be below entry")
-            tp_pips = round(sl_pips * self.rr_ratio, 1)
-            tp_price = round(entry_price + tp_pips * pip, decimals)
-        else:
-            sl_price = round(swing_sl_price + spread_offset, decimals)
-            sl_pips = round((sl_price - entry_price) / pip, 1)
-            if sl_pips <= 0:
-                raise ValueError("SHORT SL must be above entry")
-            tp_pips = round(sl_pips * self.rr_ratio, 1)
-            tp_price = round(entry_price - tp_pips * pip, decimals)
-
-        return OrderSpec(
-            pair=pair,
-            direction=direction,
-            entry_price=round(entry_price, decimals),
-            sl_price=sl_price,
-            tp_price=tp_price,
-            sl_pips=sl_pips,
-            tp_pips=tp_pips,
-            lot_size=lot_size,
-            price_decimals=decimals,
-        )
+from trading_d1_bougie.core.order_manager import OrderManager, OrderSpec  # noqa: F401
 
 
 class TestOrderManagerEURUSD:
@@ -117,7 +47,7 @@ class TestOrderManagerEURUSD:
 
     def test_invalid_direction(self):
         """Direction invalide → ValueError."""
-        with pytest.raises(ValueError, match="Invalid direction"):
+        with pytest.raises(ValueError, match="direction must be LONG or SHORT"):
             self.mgr.build("EURUSD", "FLAT", 1.0910, 1.0900, 0.1)
 
     def test_price_decimals_eurusd(self):

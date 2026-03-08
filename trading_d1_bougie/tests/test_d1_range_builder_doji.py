@@ -4,12 +4,12 @@
 # DESCRIPTION  : Tests D1RangeBuilder — gestion bougie doji
 # AUTHOR       : TRADING-D1-BOUGIE Dev Team
 # PYTHON       : 3.11.9
-# LAST UPDATED : 2026-03-07
+# LAST UPDATED : 2026-03-08
 # ============================================================
 
 import pytest
 
-from trading_d1_bougie.tests.test_d1_range_builder_normal import D1RangeBuilder
+from trading_d1_bougie.core.d1_range_builder import D1RangeBuilder
 
 
 class TestD1RangeBuilderDoji:
@@ -28,13 +28,7 @@ class TestD1RangeBuilderDoji:
     def test_doji_fibo_smaller_than_proximity(self):
         """Sur un doji, la zone Fibo doit rester entre les zones de proximité."""
         d1 = self.builder.build("EURUSD", d1_high=1.10010, d1_low=1.10000)
-        # Les zones Fibo sont autour du mid
         assert d1.fibo_zone_lower >= d1.low
         assert d1.fibo_zone_upper <= d1.high
-
-    def test_doji_zones_are_symmetric(self):
-        """Les zones Fibo doivent être symétriques par rapport au mid."""
-        d1 = self.builder.build("GBPUSD", d1_high=1.26005, d1_low=1.26000)
-        assert d1.mid - d1.fibo_zone_lower == pytest.approx(
-            d1.fibo_zone_upper - d1.mid, abs=1e-10
-        )
+        assert d1.proximity_lower >= d1.low
+        assert d1.proximity_upper <= d1.high

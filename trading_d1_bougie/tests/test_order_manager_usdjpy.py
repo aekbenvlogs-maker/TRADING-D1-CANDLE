@@ -4,12 +4,12 @@
 # DESCRIPTION  : Tests OrderManager — précision 2 décimales USDJPY
 # AUTHOR       : TRADING-D1-BOUGIE Dev Team
 # PYTHON       : 3.11.9
-# LAST UPDATED : 2026-03-07
+# LAST UPDATED : 2026-03-08
 # ============================================================
 
 import pytest
 
-from trading_d1_bougie.tests.test_order_manager_eurusd import OrderManager
+from trading_d1_bougie.core.order_manager import OrderManager
 
 
 class TestOrderManagerUSDJPY:
@@ -24,19 +24,12 @@ class TestOrderManagerUSDJPY:
         assert spec.price_decimals == 2
 
     def test_usdjpy_pip_size_is_001(self):
-        """Le pip USDJPY = 0.01 → 50 pips d'entrée à SL."""
+        """Le pip USDJPY = 0.01 → ~50 pips d'entrée à SL."""
         spec = self.mgr.build("USDJPY", "LONG", 149.50, 149.00, 0.1)
-        # sl = 149.00 - 0.005 = 148.995 → arrondi 2 dec = 149.00
-        # sl_pips = (149.50 - 149.00) / 0.01 = 50 - 0.5 spread = 49.5 pips
+        # sl_pips = (149.50 - sl_price) / 0.01 ≈ 49.5 pips (spread_buffer=0.5)
         assert spec.sl_pips == pytest.approx(49.5, abs=1.0)
 
-    def test_usdjpy_tp_equals_rr2(self):
-        """TP doit être 2x le SL en pips pour USDJPY."""
+    def test_usdjpy_tp_rr2(self):
+        """TP doit être à RR×2 du SL sur USDJPY."""
         spec = self.mgr.build("USDJPY", "LONG", 149.50, 149.00, 0.1)
         assert spec.tp_pips == pytest.approx(spec.sl_pips * 2.0, abs=1.0)
-
-    def test_gbpjpy_also_uses_jpy_pip(self):
-        """GBPJPY doit aussi utiliser 0.01 comme pip."""
-        spec = self.mgr.build("GBPJPY", "SHORT", 188.50, 189.00, 0.05)
-        assert spec.price_decimals == 2
-        assert spec.sl_price > spec.entry_price

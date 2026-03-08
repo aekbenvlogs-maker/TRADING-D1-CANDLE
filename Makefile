@@ -8,8 +8,8 @@ lint:
 typecheck:
 	mypy trading_d1_bougie/
 
-test:
-	pytest --cov --cov-fail-under=80
+test: build
+	pytest trading_d1_bougie/tests/ --cov=trading_d1_bougie.core --cov-fail-under=80 -v
 
 qa:
 	$(MAKE) format

@@ -1,5 +1,7 @@
 # 📊 TRADING-D1-BOUGIE — D1 Range / M15 Structure Bot
 
+[![CI — Quality Gate](https://github.com/aekbenvlogs-maker/TRADING-D1-CANDLE/actions/workflows/ci.yml/badge.svg)](https://github.com/aekbenvlogs-maker/TRADING-D1-CANDLE/actions/workflows/ci.yml)
+
 > **Stratégie :** Bougie D1 de la veille comme référence | Entrée M15 sur BOS/CHoCH aux extrémités  
 > **Stack :** Python 3.11.9 + Cython 3.0+ + IB Gateway + VSCode  
 > **Mode par défaut :** ⚠️ PAPER TRADING — Ne jamais activer le live sans validation complète

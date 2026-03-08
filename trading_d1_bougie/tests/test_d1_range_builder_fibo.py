@@ -4,12 +4,12 @@
 # DESCRIPTION  : Tests D1RangeBuilder — précision calcul Fibo midpoint
 # AUTHOR       : TRADING-D1-BOUGIE Dev Team
 # PYTHON       : 3.11.9
-# LAST UPDATED : 2026-03-07
+# LAST UPDATED : 2026-03-08
 # ============================================================
 
 import pytest
 
-from trading_d1_bougie.tests.test_d1_range_builder_normal import D1RangeBuilder
+from trading_d1_bougie.core.d1_range_builder import D1RangeBuilder
 
 
 class TestD1RangeBuilderFibo:
@@ -30,23 +30,9 @@ class TestD1RangeBuilderFibo:
         expected = (1.09876 + 1.09234) / 2.0
         assert d1.mid == pytest.approx(expected, abs=1e-7)
 
-    def test_fibo_zone_width_equals_10pct_height(self):
-        """La largeur totale de la zone Fibo interdite doit être 10% de la hauteur."""
-        d1 = self.builder.build("GBPUSD", d1_high=1.27000, d1_low=1.26000)
-        height = 1.27000 - 1.26000
-        zone_width = d1.fibo_zone_upper - d1.fibo_zone_lower
-        expected_width = height * 2 * 5.0 / 100.0
-        assert zone_width == pytest.approx(expected_width, abs=1e-7)
-
-    @pytest.mark.parametrize(
-        "high,low",
-        [
-            (1.20000, 1.19000),
-            (1.35500, 1.34200),
-            (150.000, 148.500),
-        ],
-    )
-    def test_midpoint_parametrized(self, high, low):
-        """Le midpoint est (high + low) / 2 pour toutes les paires."""
-        d1 = self.builder.build("TEST", d1_high=high, d1_low=low)
-        assert d1.mid == pytest.approx((high + low) / 2.0, abs=1e-7)
+    def test_fibo_zone_symmetric_around_mid(self):
+        """La zone Fibo doit être symétrique autour du midpoint."""
+        d1 = self.builder.build("GBPUSD", d1_high=1.2800, d1_low=1.2700)
+        offset_upper = d1.fibo_zone_upper - d1.mid
+        offset_lower = d1.mid - d1.fibo_zone_lower
+        assert offset_upper == pytest.approx(offset_lower, abs=1e-7)

@@ -4,55 +4,12 @@
 # DESCRIPTION  : Tests RiskManager — calcul lot size correct
 # AUTHOR       : TRADING-D1-BOUGIE Dev Team
 # PYTHON       : 3.11.9
-# LAST UPDATED : 2026-03-07
+# LAST UPDATED : 2026-03-08
 # ============================================================
-
-from enum import Enum
 
 import pytest
 
-
-class RiskCheckResult(Enum):
-    ALLOWED = "ALLOWED"
-    BLOCKED_DAILY_LIMIT = "BLOCKED: DAILY_LOSS_LIMIT"
-    BLOCKED_MAX_PAIRS = "BLOCKED: MAX_OPEN_PAIRS"
-
-
-class RiskManager:
-    def __init__(
-        self, risk_pct=1.0, daily_loss_limit_pct=3.0, max_open_pairs=1, lot_type="mini"
-    ):
-        self.risk_pct = risk_pct
-        self.daily_loss_limit_pct = daily_loss_limit_pct
-        self.max_open_pairs = max_open_pairs
-        multipliers = {"standard": 100_000.0, "mini": 10_000.0, "micro": 1_000.0}
-        if lot_type not in multipliers:
-            raise ValueError(f"Invalid lot_type: {lot_type}")
-        self.lot_type_multiplier = multipliers[lot_type]
-
-    def calculate_lot_size(self, equity, sl_pips, pair):
-        if equity <= 0:
-            raise ValueError("equity must be > 0")
-        if sl_pips <= 0:
-            raise ValueError("sl_pips must be > 0")
-        pip_size = 0.01 if "JPY" in pair.upper() else 0.0001
-        pip_value_per_lot = pip_size * self.lot_type_multiplier
-        risk_amount = equity * (self.risk_pct / 100.0)
-        lot_size = risk_amount / (sl_pips * pip_value_per_lot)
-        return round(max(0.01, round(lot_size, 2)), 2)
-
-    def check_daily_limit(self, equity_start, equity_current):
-        if equity_start <= 0:
-            raise ValueError("equity_start must be > 0")
-        daily_pnl_pct = ((equity_current - equity_start) / equity_start) * 100.0
-        if daily_pnl_pct <= -self.daily_loss_limit_pct:
-            return RiskCheckResult.BLOCKED_DAILY_LIMIT
-        return RiskCheckResult.ALLOWED
-
-    def check_max_pairs(self, open_pairs_count):
-        if open_pairs_count >= self.max_open_pairs:
-            return RiskCheckResult.BLOCKED_MAX_PAIRS
-        return RiskCheckResult.ALLOWED
+from trading_d1_bougie.core.risk_manager import RiskManager, RiskCheckResult  # noqa: F401
 
 
 class TestRiskManagerLotSize:

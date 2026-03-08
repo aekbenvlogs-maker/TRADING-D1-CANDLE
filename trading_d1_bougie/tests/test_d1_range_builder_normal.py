@@ -4,66 +4,12 @@
 # DESCRIPTION  : Tests D1RangeBuilder — données normales
 # AUTHOR       : TRADING-D1-BOUGIE Dev Team
 # PYTHON       : 3.11.9
-# LAST UPDATED : 2026-03-07
+# LAST UPDATED : 2026-03-08
 # ============================================================
-
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# Helpers — pure Python simulation du D1RangeBuilder (avant compilation Cython)
-# ---------------------------------------------------------------------------
-
-
-class D1Range:
-    def __init__(
-        self,
-        pair,
-        high,
-        low,
-        mid,
-        fibo_zone_upper,
-        fibo_zone_lower,
-        proximity_upper,
-        proximity_lower,
-    ):
-        self.pair = pair
-        self.high = high
-        self.low = low
-        self.mid = mid
-        self.fibo_zone_upper = fibo_zone_upper
-        self.fibo_zone_lower = fibo_zone_lower
-        self.proximity_upper = proximity_upper
-        self.proximity_lower = proximity_lower
-
-
-class D1RangeBuilder:
-    def __init__(self, fibo_forbidden_pct=5.0, proximity_buffer_pct=10.0):
-        self.fibo_forbidden_pct = fibo_forbidden_pct
-        self.proximity_buffer_pct = proximity_buffer_pct
-
-    def build(self, pair, d1_high, d1_low):
-        if d1_high <= d1_low:
-            raise ValueError("d1_high must be > d1_low")
-        height = d1_high - d1_low
-        mid = (d1_high + d1_low) / 2.0
-        fibo_offset = height * self.fibo_forbidden_pct / 100.0
-        proximity_offset = height * self.proximity_buffer_pct / 100.0
-        return D1Range(
-            pair=pair,
-            high=d1_high,
-            low=d1_low,
-            mid=mid,
-            fibo_zone_upper=mid + fibo_offset,
-            fibo_zone_lower=mid - fibo_offset,
-            proximity_upper=d1_high - proximity_offset,
-            proximity_lower=d1_low + proximity_offset,
-        )
-
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
+from trading_d1_bougie.core.d1_range_builder import D1RangeBuilder, D1Range  # noqa: F401
 
 
 class TestD1RangeBuilderNormal:

@@ -4,66 +4,10 @@
 # DESCRIPTION  : Tests TrendDetector — détection BULLISH HH/HL
 # AUTHOR       : TRADING-D1-BOUGIE Dev Team
 # PYTHON       : 3.11.9
-# LAST UPDATED : 2026-03-07
+# LAST UPDATED : 2026-03-08
 # ============================================================
 
-from enum import Enum
-
-# Pure Python mirror du TrendDetector Cython (avant compilation)
-
-
-class TrendBias(Enum):
-    BULLISH = "BULLISH"
-    BEARISH = "BEARISH"
-    NEUTRAL = "NEUTRAL"
-
-
-class TrendDetector:
-    def __init__(self, swing_lookback=3):
-        self.swing_lookback = swing_lookback
-
-    def find_swing_highs(self, candles):
-        swings = []
-        n = len(candles)
-        for i in range(self.swing_lookback, n - self.swing_lookback):
-            price = candles[i]["high"]
-            is_swing = all(
-                candles[j]["high"] < price
-                for j in range(i - self.swing_lookback, i + self.swing_lookback + 1)
-                if j != i
-            )
-            if is_swing:
-                swings.append({"index": i, "price": price})
-        return swings
-
-    def find_swing_lows(self, candles):
-        swings = []
-        n = len(candles)
-        for i in range(self.swing_lookback, n - self.swing_lookback):
-            price = candles[i]["low"]
-            is_swing = all(
-                candles[j]["low"] > price
-                for j in range(i - self.swing_lookback, i + self.swing_lookback + 1)
-                if j != i
-            )
-            if is_swing:
-                swings.append({"index": i, "price": price})
-        return swings
-
-    def detect(self, candles):
-        highs = self.find_swing_highs(candles)
-        lows = self.find_swing_lows(candles)
-        if len(highs) < 2 or len(lows) < 2:
-            return TrendBias.NEUTRAL
-        hh = highs[-1]["price"] > highs[-2]["price"]
-        hl = lows[-1]["price"] > lows[-2]["price"]
-        ll = lows[-1]["price"] < lows[-2]["price"]
-        lh = highs[-1]["price"] < highs[-2]["price"]
-        if hh and hl:
-            return TrendBias.BULLISH
-        elif ll and lh:
-            return TrendBias.BEARISH
-        return TrendBias.NEUTRAL
+from trading_d1_bougie.core.trend_detector import TrendDetector, TrendBias  # noqa: F401
 
 
 def _make_candle(h, low_, o=None, c=None):

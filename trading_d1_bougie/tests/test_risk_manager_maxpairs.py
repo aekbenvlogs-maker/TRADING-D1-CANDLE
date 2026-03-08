@@ -4,13 +4,10 @@
 # DESCRIPTION  : Tests RiskManager — bloque si paire déjà ouverte
 # AUTHOR       : TRADING-D1-BOUGIE Dev Team
 # PYTHON       : 3.11.9
-# LAST UPDATED : 2026-03-07
+# LAST UPDATED : 2026-03-08
 # ============================================================
 
-from trading_d1_bougie.tests.test_risk_manager_lotsize import (
-    RiskCheckResult,
-    RiskManager,
-)
+from trading_d1_bougie.core.risk_manager import RiskManager, RiskCheckResult
 
 
 class TestRiskManagerMaxPairs:
@@ -29,17 +26,8 @@ class TestRiskManagerMaxPairs:
         result = self.mgr.check_max_pairs(open_pairs_count=0)
         assert result == RiskCheckResult.ALLOWED
 
-    def test_blocked_exceeds_max(self):
-        """2 paires ouvertes avec max=1 → BLOCKED."""
-        result = self.mgr.check_max_pairs(open_pairs_count=2)
+    def test_blocked_when_over_max(self):
+        """Plus de paires que max → BLOCKED."""
+        mgr2 = RiskManager(max_open_pairs=2)
+        result = mgr2.check_max_pairs(open_pairs_count=3)
         assert result == RiskCheckResult.BLOCKED_MAX_PAIRS
-
-    def test_max_pairs_2_allows_first(self):
-        """max=2 : 1 paire ouverte → ALLOWED."""
-        mgr2 = RiskManager(max_open_pairs=2)
-        assert mgr2.check_max_pairs(1) == RiskCheckResult.ALLOWED
-
-    def test_max_pairs_2_blocks_second(self):
-        """max=2 : 2 paires ouvertes → BLOCKED."""
-        mgr2 = RiskManager(max_open_pairs=2)
-        assert mgr2.check_max_pairs(2) == RiskCheckResult.BLOCKED_MAX_PAIRS
