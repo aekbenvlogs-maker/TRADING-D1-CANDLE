@@ -119,6 +119,38 @@ async def _maybe_refresh_d1_ranges(
     return today
 
 
+async def _rebuild_open_pairs(broker: "BrokerAPI") -> "dict[str, int]":
+    """Reconstruit open_pairs depuis les trades IB actifs au démarrage.
+
+    Évite les doubles positions après redémarrage du bot.
+    """
+    result: dict[str, int] = {}
+    try:
+        trades = broker.ib.openTrades()
+        for trade in trades:
+            symbol = getattr(trade.contract, "symbol", "")
+            currency = getattr(trade.contract, "currency", "")
+            if not symbol or not currency:
+                continue
+            pair = f"{symbol}{currency}"
+            order_id = trade.order.orderId
+            # Ne conserver que l'ordre parent (parentId == 0)
+            if trade.order.parentId == 0:
+                result[pair] = order_id
+                logger.warning(
+                    f"[Main] ⚠️ Position existante détectée au démarrage : "
+                    f"{pair} — orderId {order_id}"
+                )
+        if result:
+            await _send_telegram(
+                f"⚠️ <b>REDÉMARRAGE</b> — {len(result)} position(s) existante(s) détectée(s)\n"
+                + "\n".join(f"• {p}" for p in result)
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"[Main] Erreur reconstruction open_pairs : {exc}")
+    return result
+
+
 async def _main_loop(
     broker: BrokerAPI,
     data_feed: DataFeed,
@@ -156,7 +188,8 @@ async def _main_loop(
 
     pairs = strategy["pairs"]
     d1_ranges: dict[str, Any] = {}
-    open_pairs: dict[str, int] = {}   # pair → IB orderId
+    # C3: Reconstruire open_pairs depuis les trades IB actifs (survie au redémarrage)
+    open_pairs: dict[str, int] = await _rebuild_open_pairs(broker)
     daily_trade_count: dict[str, int] = {p: 0 for p in pairs}
     last_d1_refresh: date = date.min
     previous_date: date = date.min
@@ -204,6 +237,21 @@ async def _main_loop(
             if today != previous_date:
                 daily_trade_count = {p: 0 for p in pairs}
                 previous_date = today
+                # C2: Réinitialiser equity_start pour le calcul daily limit correct
+                try:
+                    equity_start = await broker.fetch_equity()
+                    logger.info(
+                        f"[Main] 🗓️ Nouvelle journée {today} — "
+                        "equity_start réinitialisée : $"
+                        f"{equity_start:,.2f}"
+                    )
+                    await _send_telegram(
+                        f"📅 <b>NOUVELLE SESSION</b> — {today}\n"
+                        "Equity de référence : $"
+                        f"{equity_start:,.2f}"
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(f"[Main] equity_start refresh failed : {exc}")
                 logger.info("[Main] 🗓️ Nouvelle journée — compteurs remis à zéro")
 
             # -------------------------------------------------------- #
@@ -224,6 +272,19 @@ async def _main_loop(
                 if pair not in d1_ranges:
                     continue
                 if daily_trade_count[pair] >= strategy["max_daily_trades"]:
+                    continue
+
+                # C4: Filtre hauteur minimale D1 (aligne main.py sur backtest_standalone)
+                _pip_size_c4: float = 0.01 if "JPY" in pair else 0.0001
+                _d1_height_pips: float = (
+                    d1_ranges[pair].high - d1_ranges[pair].low
+                ) / _pip_size_c4
+                _min_range: float = float(strategy.get("min_d1_range_pips", 20.0))
+                if _d1_height_pips < _min_range:
+                    logger.debug(
+                        f"[Main] ⏭️ {pair} — range D1 trop étroit "
+                        f"({_d1_height_pips:.1f}p < {_min_range}p) — skip"
+                    )
                     continue
 
                 # -------------------------------------------------------- #
@@ -360,8 +421,8 @@ async def _main_loop(
                     f"Equity: ${equity_current:,.2f}"
                 )
 
-                        await asyncio.sleep(30)
             live.update(dashboard.render())
+            await asyncio.sleep(30)
 
 
 async def _connect_with_retry(
@@ -391,9 +452,11 @@ async def _connect_with_retry(
                 f"       → Retry dans {delay:.0f}s … (Ctrl+C pour quitter)"
             )
             if attempt == 1:
-                import asyncio as _asyncio
-                _asyncio.ensure_future(
-                    _send_telegram("🔴 <b>DÉCONNEXION IB GATEWAY</b>\nTentative de reconnexion...")
+                asyncio.ensure_future(
+                    _send_telegram(
+                        "🔴 <b>DÉCONNEXION IB GATEWAY</b>\n"
+                        "Tentative de reconnexion..."
+                    )
                 )
             if max_attempts > 0 and attempt >= max_attempts:
                 logger.error("[Main] Nombre maximum de tentatives atteint")

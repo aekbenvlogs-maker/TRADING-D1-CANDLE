@@ -136,7 +136,7 @@ class BacktestRunner:
                     return "SL"
         return "OPEN"
 
-        def _simulate_signals(
+    def _simulate_signals(
         self, d1_df: pd.DataFrame, m15_df: pd.DataFrame, pair: str
     ) -> pd.DataFrame:
         """

@@ -8,7 +8,7 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from rich.console import Console
@@ -94,7 +94,7 @@ class Dashboard:
             if self._ib_connected
             else "[red]🔴 IB DISCONNECTED[/red]"
         )
-        now_utc = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
         from zoneinfo import ZoneInfo
 
