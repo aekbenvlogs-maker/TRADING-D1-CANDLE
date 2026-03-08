@@ -18,6 +18,7 @@ class RiskManager:
         equity: float,
         sl_pips: float,
         pair: str,
+        spot_price: float = 1.0,
     ) -> float: ...
     def check_daily_limit(
         self,

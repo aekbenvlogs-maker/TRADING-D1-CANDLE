@@ -8,7 +8,9 @@
 # LAST UPDATED : 2026-03-07
 # ============================================================
 
-from datetime import datetime, time
+import csv
+from datetime import datetime, time, timedelta, timezone
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 UTC = ZoneInfo("UTC")
@@ -116,3 +118,59 @@ class SessionManager:
             "utc": dt_utc.strftime("%Y-%m-%d %H:%M:%S UTC"),
             "paris": paris_dt.strftime("%Y-%m-%d %H:%M:%S %Z"),
         }
+
+    def load_news_calendar(self, csv_path: str) -> None:
+        """Charge un calendrier d’événements macro depuis un fichier CSV.
+
+        Format CSV attendu (ForexFactory export) :
+            date,time,currency,impact,event
+            2026-03-07,14:30,USD,HIGH,Non-Farm Payrolls
+
+        Args:
+            csv_path: Chemin vers le fichier CSV
+        """
+        self._news_events: list[datetime] = []
+        path = Path(csv_path)
+        if not path.exists():
+            import logging
+            logging.getLogger(__name__).warning(
+                f"[SessionManager] Calendrier news introuvable : {csv_path}"
+            )
+            return
+        with open(path, newline="", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get("impact", "").upper() == "HIGH":
+                    try:
+                        dt = datetime.strptime(
+                            f"{row['date']} {row['time']}", "%Y-%m-%d %H:%M"
+                        ).replace(tzinfo=timezone.utc)
+                        self._news_events.append(dt)
+                    except (ValueError, KeyError):
+                        pass
+
+    def is_news_window(
+        self,
+        dt: "datetime | None" = None,
+        buffer_before_min: int = 30,
+        buffer_after_min: int = 30,
+    ) -> bool:
+        """Retourne True si l’heure courante est dans une fenêtre news haute volatilité.
+
+        Args:
+            dt: Datetime à vérifier (défaut : maintenant UTC)
+            buffer_before_min: Minutes de blocage AVANT l’annonce
+            buffer_after_min: Minutes de blocage APRÈS l’annonce
+
+        Returns:
+            True si trading bloqué (fenêtre news), False sinon
+        """
+        if not hasattr(self, "_news_events") or not self._news_events:
+            return False
+        now = dt or datetime.now(timezone.utc)
+        before = timedelta(minutes=buffer_before_min)
+        after = timedelta(minutes=buffer_after_min)
+        for event_dt in self._news_events:
+            if (event_dt - before) <= now <= (event_dt + after):
+                return True
+        return False

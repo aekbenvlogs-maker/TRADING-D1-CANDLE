@@ -119,7 +119,42 @@ async def _maybe_refresh_d1_ranges(
     return today
 
 
+async def _cancel_orphan_gtc_orders(
+    broker: "BrokerAPI",
+) -> int:
+    """Annule les ordres GTC (SL/TP) dont le parent n'est plus actif.
+
+    Scénario ciblé : bot redémarre, position clôturée par IB mais ordres
+    enfants (TP/SL GTC) toujours actifs → risque de réouverture involontaire.
+
+    Returns:
+        Nombre d'ordres orphelins annulés.
+    """
+    cancelled = 0
+    try:
+        open_trades = broker.ib.openTrades()
+        parent_ids = {
+            t.order.orderId for t in open_trades if t.order.parentId == 0
+        }
+        for trade in open_trades:
+            if trade.order.parentId != 0 and trade.order.parentId not in parent_ids:
+                logger.warning(
+                    f"[Main] 🗑️ Ordre GTC orphelin annulé : "
+                    f"orderId={trade.order.orderId} parentId={trade.order.parentId}"
+                )
+                broker.ib.cancelOrder(trade.order)
+                await _send_telegram(
+                    f"🗑️ <b>ORDRE ORPHELIN ANNULÉ</b>\n"
+                    f"orderId: {trade.order.orderId}"
+                )
+                cancelled += 1
+    except Exception as exc:  # noqa: BLE001
+        logger.error(f"[Main] Erreur annulation ordres orphelins : {exc}")
+    return cancelled
+
+
 async def _rebuild_open_pairs(broker: "BrokerAPI") -> "dict[str, int]":
+
     """Reconstruit open_pairs depuis les trades IB actifs au démarrage.
 
     Évite les doubles positions après redémarrage du bot.
@@ -190,6 +225,14 @@ async def _main_loop(
     d1_ranges: dict[str, Any] = {}
     # C3: Reconstruire open_pairs depuis les trades IB actifs (survie au redémarrage)
     open_pairs: dict[str, int] = await _rebuild_open_pairs(broker)
+    # M7: Annuler les ordres GTC orphelins (enfants sans parent actif)
+    await _cancel_orphan_gtc_orders(broker)
+    # M8: Charger le calendrier économique si disponible
+    _news_csv = cfg.get("general", {}).get(
+        "news_calendar_csv",
+        "trading_d1_bougie/config/news_calendar.csv",
+    )
+    session_mgr.load_news_calendar(_news_csv)
     daily_trade_count: dict[str, int] = {p: 0 for p in pairs}
     last_d1_refresh: date = date.min
     previous_date: date = date.min
@@ -266,6 +309,12 @@ async def _main_loop(
                 logger.debug("[Main] Outside active session — waiting…")
                 await asyncio.sleep(60)
                 live.update(dashboard.render())
+                continue
+
+            # M8: Bloquer le trading pendant les fenêtres news haute volatilité
+            if session_mgr.is_news_window():
+                logger.info("[Main] 📰 Fenêtre news haute volatilité — trading suspendu")
+                await asyncio.sleep(60)
                 continue
 
             for pair in pairs:
@@ -370,12 +419,14 @@ async def _main_loop(
                 # -------------------------------------------------------- #
                 # Étape 5 — Sizing avec SL réel                           #
                 # -------------------------------------------------------- #
-                swing_sl: float = (
-                    d1_ranges[pair].low
-                    if validation.direction == "LONG"
-                    else d1_ranges[pair].high
-                )
+                # M3: SL avec buffer configurable (unifie live/backtest)
+                _sl_buf: float = float(strategy.get("sl_buffer_pips", 3.0))
                 pip_size: float = 0.01 if "JPY" in pair else 0.0001
+                swing_sl: float = (
+                    d1_ranges[pair].low - _sl_buf * pip_size
+                    if validation.direction == "LONG"
+                    else d1_ranges[pair].high + _sl_buf * pip_size
+                )
                 real_sl_pips: float = round(abs(price - swing_sl) / pip_size, 1)
 
                 if real_sl_pips <= 0:
@@ -386,6 +437,7 @@ async def _main_loop(
                     equity=equity_current,
                     sl_pips=real_sl_pips,
                     pair=pair,
+                    spot_price=price,   # M2: needed for JPY pair pip value
                 )
 
                 # -------------------------------------------------------- #

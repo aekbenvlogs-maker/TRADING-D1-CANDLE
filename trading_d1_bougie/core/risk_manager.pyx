@@ -59,6 +59,7 @@ cdef class RiskManager:
         double equity,
         double sl_pips,
         str pair,
+        double spot_price = 1.0,    # M2: needed for JPY inverse pip value
     ):
         """
         Calcule la taille de position en lots.
@@ -82,8 +83,14 @@ cdef class RiskManager:
             raise ValueError(f"sl_pips must be > 0, got {sl_pips}")
 
         cdef double pip_size = 0.01 if "JPY" in pair.upper() else 0.0001
-        # pip_value_per_lot = pip_size × lot_size_units × 1 USD (simplifié USD quote)
-        cdef double pip_value_per_lot = pip_size * self.lot_type_multiplier
+        # M2: pip_value_per_lot en USD
+        # Paires JPY (inverses) : pip_value = (pip_size * lots) / spot_price
+        # Paires directes USD   : pip_value = pip_size * lots
+        cdef double pip_value_per_lot
+        if "JPY" in pair.upper() and spot_price > 0:
+            pip_value_per_lot = (pip_size * self.lot_type_multiplier) / spot_price
+        else:
+            pip_value_per_lot = pip_size * self.lot_type_multiplier
         cdef double risk_amount = equity * (self.risk_pct / 100.0)
         cdef double lot_size = risk_amount / (sl_pips * pip_value_per_lot)
 

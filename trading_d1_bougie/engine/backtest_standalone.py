@@ -190,7 +190,7 @@ class StandaloneBacktester:
         )
 
     def _simulate_pair(
-        self, pair: str, days: int = 500
+        self, pair: str, days: int = 500, seed_offset: int = 0
     ) -> list[dict[str, Any]]:
         """
         Simule la stratégie jour par jour sur une paire.
@@ -251,7 +251,7 @@ class StandaloneBacktester:
                 start_price=mid_price,
                 sigma_m15=sigma_m15,
                 n_bars=128,
-                seed=day_idx * 1337,
+                seed=day_idx * 1337 + seed_offset,
             )
 
             # Détecter la tendance sur toute la fenêtre
@@ -308,17 +308,21 @@ class StandaloneBacktester:
 
             # Déterminer direction et swing SL
             direction = str(validation.direction) if hasattr(validation, "direction") else "LONG"
+            # M3: SL buffer depuis config (unifie backtest/live)
+            _sl_buf_bs: float = float(self.cfg["strategy"].get("sl_buffer_pips", 3.0))
             if direction in ("LONG", "long", "BUY"):
-                swing_sl_price = d1_range.low - pip_size * 3
+                swing_sl_price = d1_range.low - pip_size * _sl_buf_bs
             else:
-                swing_sl_price = d1_range.high + pip_size * 3
+                swing_sl_price = d1_range.high + pip_size * _sl_buf_bs
 
             # Position sizing
             sl_pips = abs(price - swing_sl_price) / pip_size
             if sl_pips < 2:
                 continue
 
-            lot_size = self.risk_manager.calculate_lot_size(equity, sl_pips, pair)
+            lot_size = self.risk_manager.calculate_lot_size(
+                equity, sl_pips, pair, spot_price=price
+            )  # M2: pass spot_price for JPY
             if lot_size <= 0:
                 continue
 
@@ -411,6 +415,66 @@ class StandaloneBacktester:
         _export_equity_curve(all_trades, pair_results)
 
         return pair_results
+
+
+    def _run_period(
+        self, n_days: int, seed_offset: int = 0
+    ) -> dict[str, Any]:
+        """Lance le backtest sur une période avec un offset de seed spécifique."""
+        all_trades: list[dict[str, Any]] = []
+        for pair in self.pairs:
+            trades = self._simulate_pair(pair, days=n_days, seed_offset=seed_offset)
+            all_trades.extend(trades)
+        return _compute_metrics(all_trades, "PERIOD")
+
+    def run_walk_forward(
+        self,
+        n_days: int = 500,
+        in_sample_pct: float = 0.80,
+    ) -> dict[str, Any]:
+        """Walk-forward backtest : IS (80%) + OOS (20%).
+
+        Les paramètres sont calibrés sur l'in-sample uniquement.
+        La validation est effectuée sur l'out-of-sample (OOS) uniquement.
+        Un ratio OOS/IS < 0.70 indique un sur-ajustement probable.
+
+        Args:
+            n_days: Nombre total de jours simulés
+            in_sample_pct: Fraction in-sample (défaut 0.80)
+
+        Returns:
+            dict avec métriques IS, OOS et ratios de dégradation
+        """
+        n_is = int(n_days * in_sample_pct)
+        n_oos = n_days - n_is
+
+        logger.info(f"[WalkForward] {n_is} jours IS + {n_oos} jours OOS")
+
+        is_results = self._run_period(n_days=n_is, seed_offset=0)
+        oos_results = self._run_period(n_days=n_oos, seed_offset=n_is * 1000)
+
+        wr_is = is_results.get("winrate_pct", 0.0)
+        wr_oos = oos_results.get("winrate_pct", 0.0)
+        pf_is = is_results.get("profit_factor", 0.0)
+        pf_oos = oos_results.get("profit_factor", 0.0)
+
+        wr_ratio = wr_oos / wr_is if wr_is > 0 else 0.0
+        pf_ratio = pf_oos / pf_is if pf_is > 0 else 0.0
+
+        logger.info(f"[WalkForward] IS  → WR: {wr_is:.1f}% | PF: {pf_is:.2f}")
+        logger.info(f"[WalkForward] OOS → WR: {wr_oos:.1f}% | PF: {pf_oos:.2f}")
+        logger.info(f"[WalkForward] Ratio OOS/IS — WR: {wr_ratio:.2f} | PF: {pf_ratio:.2f}")
+
+        if wr_ratio < 0.70:
+            logger.warning("⚠️ [WalkForward] OOS/IS ratio < 0.70 — sur-ajustement probable")
+
+        return {
+            "in_sample": is_results,
+            "out_of_sample": oos_results,
+            "wr_degradation_ratio": wr_ratio,
+            "pf_degradation_ratio": pf_ratio,
+            "overfitting_detected": wr_ratio < 0.70,
+        }
 
 
 # ------------------------------------------------------------------ #

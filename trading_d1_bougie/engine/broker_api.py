@@ -17,8 +17,10 @@ from typing import Any
 from ib_insync import IB, Contract
 from loguru import logger
 
+from trading_d1_bougie.engine.broker_interface import IBroker
 
-class BrokerAPI:
+
+class BrokerAPI(IBroker):
     """
     Interface IB Gateway via ib_insync.
 
@@ -65,16 +67,74 @@ class BrokerAPI:
         logger.warning("⚠️  IB Gateway disconnected — scheduling reconnect…")
         asyncio.ensure_future(self._reconnect())
 
-    async def _reconnect(self, retries: int = 10, delay: float = 5.0) -> None:
-        for attempt in range(1, retries + 1):
+    async def _reconnect(self) -> None:
+        """Tentatives de reconnexion IB sans limite.
+
+        Stratégie d'alertes :
+          - Tentative 1     : WARNING + Telegram
+          - Tentative 5     : ERROR + Telegram escalade
+          - Tentative 12+   : CRITICAL + Telegram urgence (toutes les 12 tentatives)
+
+        S'arrête uniquement sur reconnexion réussie ou arrêt manuel.
+        """
+        attempt = 0
+        while True:
+            attempt += 1
+            delay = min(5 * attempt, 60)  # backoff plafonné à 60s
+
+            if attempt == 1:
+                logger.warning("[BrokerAPI] 🔴 Déconnexion IB — tentative de reconnexion")
+                asyncio.ensure_future(
+                    self._alert("🔴 <b>DÉCONNEXION IB GATEWAY</b>\nReconnexion en cours...")
+                )
+            elif attempt == 5:
+                logger.error(f"[BrokerAPI] Reconnexion échouée après {attempt} tentatives")
+                asyncio.ensure_future(
+                    self._alert(
+                        f"⚠️ <b>RECONNEXION DIFFICILE</b>\n"
+                        f"{attempt} tentatives — Position non surveillée !"
+                    )
+                )
+            elif attempt == 12 or (attempt > 12 and attempt % 12 == 0):
+                logger.critical(
+                    f"[BrokerAPI] Reconnexion impossible après {attempt} tentatives "
+                    f"({attempt * 5 // 60}min écoulées)"
+                )
+                asyncio.ensure_future(
+                    self._alert(
+                        f"🚨 <b>URGENCE — IB INJOIGNABLE</b>\n"
+                        f"{attempt} tentatives ({attempt * 5 // 60} min)\n"
+                        "Vérifier IB Gateway manuellement !"
+                    )
+                )
+
             await asyncio.sleep(delay)
+
             try:
                 await self.connect()
-                logger.info(f"✅ Reconnected (attempt {attempt})")
+                logger.info(f"[BrokerAPI] ✅ Reconnexion réussie après {attempt} tentatives")
+                asyncio.ensure_future(
+                    self._alert(
+                        f"✅ <b>RECONNEXION IB RÉUSSIE</b>\n"
+                        f"Après {attempt} tentatives ({attempt * 5}s)"
+                    )
+                )
                 return
             except Exception as exc:  # noqa: BLE001
-                logger.error(f"Reconnect attempt {attempt} failed: {exc}")
-        logger.critical("❌ Could not reconnect to IB Gateway after all retries")
+                logger.debug(f"[BrokerAPI] Tentative {attempt} échouée : {exc}")
+
+    async def _alert(self, message: str) -> None:
+        """Délègue l'alerte Telegram via callback enregistré."""
+        if hasattr(self, "_telegram_callback") and self._telegram_callback:
+            try:
+                await self._telegram_callback(message)
+            except Exception:  # noqa: BLE001
+                pass
+
+
+    def open_trades(self) -> list:
+        """Retourne les trades ouverts (implémentation IBroker)."""
+        return self.ib.openTrades()
 
     async def disconnect(self) -> None:
         self.ib.disconnect()

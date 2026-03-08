@@ -107,6 +107,15 @@ cdef class EntryValidator:
         # ------------------------------------------------------------------ #
         # Check 4 : Signal dans le sens de la tendance                       #
         # ------------------------------------------------------------------ #
+        # M4 (Option A): Cette stratégie trade BOS uniquement.
+        # Un CHoCH signale un retournement de tendance — trop risqué en
+        # D1/M15 sans confirmation supplémentaire (réservé Sprint 7+).
+        if structure_signal.signal_type == StructureType.CHOCH:
+            return ValidationResult(
+                ValidationStatus.INVALID_AGAINST_TREND,
+                reason="CHoCH not traded in current strategy (BOS-only)",
+            )
+
         if structure_signal.signal_type == StructureType.NONE:
             return ValidationResult(
                 ValidationStatus.INVALID_AGAINST_TREND,

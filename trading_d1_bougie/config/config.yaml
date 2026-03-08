@@ -3,7 +3,8 @@ strategy:
   pairs: ["EURUSD", "GBPUSD", "USDJPY"]
   rr_ratio: 2.0
   risk_pct: 1.0
-  min_d1_range_pips: 20.0      # Hauteur minimale D1 en pips pour trader
+  min_d1_range_pips: 20.0      # Hauteur minimale D1 en pips
+  sl_buffer_pips: 3.0         # Buffer sous/sur extrémité D1 pour le SL      # Hauteur minimale D1 en pips pour trader
   max_daily_trades: 2
   proximity_buffer_pct: 10.0      # % de la hauteur du rectangle
   fibo_forbidden_zone_pct: 5.0    # ± % autour du midpoint
